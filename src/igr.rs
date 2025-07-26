@@ -179,11 +179,55 @@ impl NodeData {
         let attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
         let label = def.label.unwrap_or_else(|| def.id.clone());
 
-        // Estimate initial dimensions based on label
+        // Estimate initial dimensions based on label with better text metrics
+        let font_size = attributes.font_size.unwrap_or(20.0);
+        let font_family = match attributes.font.as_deref() {
+            Some("Virgil") => 1,
+            Some("Helvetica") => 2,
+            Some("Cascadia") | Some("Code") => 3,
+            None => 3, // Default to Cascadia
+            _ => 3,
+        };
+        
+        // Calculate text dimensions using improved logic for better accuracy
+        let char_width_multiplier = match font_family {
+            1 => 0.65,  // Virgil - slightly wider
+            2 => 0.55,  // Helvetica - slightly wider  
+            3 => 0.6,   // Cascadia - wider for better readability
+            _ => 0.6,
+        };
+        
+        // Improved character width calculation with better handling for common characters
+        let effective_length = label.chars().map(|c| {
+            match c {
+                // Narrow characters
+                'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
+                // Wide characters
+                'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
+                // Uppercase letters (generally wider)
+                'A'..='Z' => 1.15,
+                // Space (reduced to save space)
+                ' ' => 0.35,
+                // Numbers and common punctuation
+                '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
+                // Default for most lowercase and other characters
+                _ => 1.0,
+            }
+        }).sum::<f64>();
+        
+        let text_width = effective_length * font_size * char_width_multiplier;
+        let text_height = font_size * 1.3; // Slightly more height for better appearance
+        
+        // Increased padding for better text visibility and node appearance
+        let padding_x = 50.0; // More horizontal padding
+        let padding_y = 25.0; // More vertical padding
+        
         let estimated_width = attributes
             .width
-            .unwrap_or_else(|| (label.len() as f64 * 8.0 + 40.0).max(80.0));
-        let estimated_height = attributes.height.unwrap_or(60.0);
+            .unwrap_or_else(|| (text_width + padding_x).max(100.0)); // Increased minimum width
+        let estimated_height = attributes
+            .height
+            .unwrap_or_else(|| (text_height + padding_y).max(70.0));  // Increased minimum height
 
         Ok(NodeData {
             id: def.id,

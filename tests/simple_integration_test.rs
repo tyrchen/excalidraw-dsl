@@ -36,5 +36,6 @@ fn test_compile_to_elements() {
     assert!(result.is_ok());
     
     let elements = result.unwrap();
-    assert_eq!(elements.len(), 3); // 2 nodes + 1 edge
+    // 2 nodes + 2 text elements + 1 edge = 5
+    assert_eq!(elements.len(), 5);
 }

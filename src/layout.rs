@@ -66,9 +66,9 @@ pub enum Direction {
 impl Default for DagreLayoutOptions {
     fn default() -> Self {
         Self {
-            node_sep: 50.0,
-            rank_sep: 100.0,
-            direction: Direction::TopBottom,
+            node_sep: 80.0,  // Increased separation between nodes in same layer
+            rank_sep: 150.0, // Increased separation between layers
+            direction: Direction::LeftRight, // Changed default to left-right
         }
     }
 }
@@ -153,6 +153,65 @@ impl DagreLayout {
     }
 
     fn position_nodes(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
+        match self.options.direction {
+            Direction::LeftRight | Direction::RightLeft => {
+                self.position_nodes_horizontal(igr, layers)
+            }
+            Direction::TopBottom | Direction::BottomTop => {
+                self.position_nodes_vertical(igr, layers)
+            }
+        }
+    }
+
+    fn position_nodes_horizontal(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
+        let mut current_x = 0.0;
+
+        for layer in layers {
+            if layer.is_empty() {
+                continue;
+            }
+
+            // Calculate total height needed for this layer
+            let total_height: f64 = layer.iter().map(|&idx| igr.graph[idx].height).sum();
+            let total_spacing = (layer.len().saturating_sub(1)) as f64 * self.options.node_sep;
+            let layer_height = total_height + total_spacing;
+
+            // Start positioning from the center
+            let start_y = -layer_height / 2.0;
+            let mut current_y = start_y;
+
+            // Find the maximum width in this layer
+            let max_width = layer
+                .iter()
+                .map(|&idx| igr.graph[idx].width)
+                .fold(0.0, f64::max);
+
+            // Position nodes in this layer
+            for &node_idx in layer {
+                let node = &mut igr.graph[node_idx];
+
+                match self.options.direction {
+                    Direction::LeftRight => {
+                        node.x = current_x + max_width / 2.0;
+                        node.y = current_y + node.height / 2.0;
+                    }
+                    Direction::RightLeft => {
+                        node.x = -(current_x + max_width / 2.0);
+                        node.y = current_y + node.height / 2.0;
+                    }
+                    _ => unreachable!(),
+                }
+
+                current_y += node.height + self.options.node_sep;
+            }
+
+            current_x += max_width + self.options.rank_sep;
+        }
+
+        Ok(())
+    }
+
+    fn position_nodes_vertical(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
         let mut current_y = 0.0;
 
         for layer in layers {
@@ -165,7 +224,7 @@ impl DagreLayout {
             let total_spacing = (layer.len().saturating_sub(1)) as f64 * self.options.node_sep;
             let layer_width = total_width + total_spacing;
 
-            // Start positioning from the left
+            // Start positioning from the center
             let start_x = -layer_width / 2.0;
             let mut current_x = start_x;
 
@@ -188,14 +247,7 @@ impl DagreLayout {
                         node.x = current_x + node.width / 2.0;
                         node.y = -(current_y + max_height / 2.0);
                     }
-                    Direction::LeftRight => {
-                        node.x = current_y + max_height / 2.0;
-                        node.y = current_x + node.width / 2.0;
-                    }
-                    Direction::RightLeft => {
-                        node.x = -(current_y + max_height / 2.0);
-                        node.y = current_x + node.width / 2.0;
-                    }
+                    _ => unreachable!(),
                 }
 
                 current_x += node.width + self.options.node_sep;
@@ -474,7 +526,7 @@ mod tests {
         let (_, node_a) = igr.get_node_by_id("a").unwrap();
         let (_, node_b) = igr.get_node_by_id("b").unwrap();
 
-        // In a top-bottom layout, B should be below A
-        assert!(node_b.y > node_a.y);
+        // In a left-right layout, B should be to the right of A
+        assert!(node_b.x > node_a.x);
     }
 }

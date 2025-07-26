@@ -119,6 +119,7 @@ impl ExcalidrawGenerator {
     pub fn generate(igr: &IntermediateGraph) -> Result<Vec<ExcalidrawElementSkeleton>> {
         let mut elements = Vec::new();
         let mut node_id_map = std::collections::HashMap::new();
+        let mut node_element_indices = std::collections::HashMap::new();
 
         // Generate container elements first (background rectangles)
         for container in &igr.containers {
@@ -167,6 +168,10 @@ impl ExcalidrawGenerator {
             // Remove text from shape element (it will be a separate element)
             let label = element.text.take();
             
+            // Track the index where this node will be inserted
+            let node_index = elements.len();
+            node_element_indices.insert(element_id.clone(), node_index);
+            
             // Generate separate text element for node label
             if let Some(label) = label {
                 if !label.is_empty() {
@@ -195,7 +200,7 @@ impl ExcalidrawGenerator {
             }
         }
 
-        // Generate edge elements
+        // Generate edge elements and update node boundElements
         for edge_ref in igr.graph.edge_references() {
             let source_node = &igr.graph[edge_ref.source()];
             let target_node = &igr.graph[edge_ref.target()];
@@ -214,14 +219,33 @@ impl ExcalidrawGenerator {
                 ))
             })?;
 
-            let element = Self::generate_edge(
+            let edge_element = Self::generate_edge(
                 edge_data,
                 source_node,
                 target_node,
                 source_element_id,
                 target_element_id,
             )?;
-            elements.push(element);
+            
+            let edge_id = edge_element.id.clone();
+            
+            // Update source node's boundElements to include this edge
+            if let Some(&source_index) = node_element_indices.get(source_element_id) {
+                elements[source_index].bound_elements.push(serde_json::json!({
+                    "id": edge_id.clone(),
+                    "type": "arrow"
+                }));
+            }
+            
+            // Update target node's boundElements to include this edge
+            if let Some(&target_index) = node_element_indices.get(target_element_id) {
+                elements[target_index].bound_elements.push(serde_json::json!({
+                    "id": edge_id.clone(),
+                    "type": "arrow"
+                }));
+            }
+            
+            elements.push(edge_element);
         }
 
         Ok(elements)
@@ -272,7 +296,7 @@ impl ExcalidrawGenerator {
             fill_style: Self::convert_fill_style(&node_data.attributes.fill_style),
             stroke_width: node_data.attributes.stroke_width.unwrap_or(2.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&node_data.attributes.stroke_style),
-            roughness: node_data.attributes.roughness.unwrap_or(1),
+            roughness: node_data.attributes.roughness.unwrap_or(0),
             opacity: 100,
             text: if node_data.label.is_empty() {
                 None
@@ -355,11 +379,11 @@ impl ExcalidrawGenerator {
             fill_style: "solid".to_string(),
             stroke_width: edge_data.attributes.stroke_width.unwrap_or(2.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&edge_data.attributes.stroke_style),
-            roughness: edge_data.attributes.roughness.unwrap_or(1),
+            roughness: edge_data.attributes.roughness.unwrap_or(0),
             opacity: 100,
             text: edge_data.label.clone(),
             font_size: 16,
-            font_family: 1, // Virgil
+            font_family: 3, // Cascadia (Code font)
             start_binding: Some(ElementBinding {
                 element_id: source_element_id.to_string(),
                 focus: 0,
@@ -489,11 +513,46 @@ impl ExcalidrawGenerator {
 
     fn convert_font_family(font: &Option<String>) -> u8 {
         match font.as_deref() {
-            Some("Virgil") | None => 1,
+            Some("Virgil") => 1,
             Some("Helvetica") => 2,
             Some("Cascadia") => 3,
-            _ => 1, // Default to Virgil
+            Some("Code") => 3, // Alias for Cascadia
+            None => 3, // Default to Cascadia (Code font)
+            _ => 3, // Default to Cascadia
         }
+    }
+
+    fn calculate_text_dimensions(text: &str, font_size: f64, font_family: u8) -> (i32, i32) {
+        // Improved text width calculation matching the IGR logic for consistency
+        let char_width_multiplier = match font_family {
+            1 => 0.65,  // Virgil - slightly wider
+            2 => 0.55,  // Helvetica - slightly wider  
+            3 => 0.6,   // Cascadia - wider for better readability
+            _ => 0.6,
+        };
+        
+        // Improved character width calculation with better handling for common characters
+        let effective_length = text.chars().map(|c| {
+            match c {
+                // Narrow characters
+                'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
+                // Wide characters
+                'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
+                // Uppercase letters (generally wider)
+                'A'..='Z' => 1.15,
+                // Space (reduced to save space)
+                ' ' => 0.35,
+                // Numbers and common punctuation
+                '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
+                // Default for most lowercase and other characters
+                _ => 1.0,
+            }
+        }).sum::<f64>();
+        
+        let text_width = (effective_length * font_size * char_width_multiplier).round() as i32;
+        let text_height = (font_size * 1.3).round() as i32; // Slightly more height for better appearance
+        
+        (text_width, text_height)
     }
 
     fn generate_text_element(
@@ -504,9 +563,8 @@ impl ExcalidrawGenerator {
         font_size: f64,
         font: &Option<String>,
     ) -> Result<ExcalidrawElementSkeleton> {
-        // Estimate text width and height
-        let text_width = (text.len() as f64 * font_size * 0.6).round() as i32;
-        let text_height = font_size.round() as i32;
+        let font_family = Self::convert_font_family(font);
+        let (text_width, text_height) = Self::calculate_text_dimensions(text, font_size, font_family);
         
         // Center the text relative to the given position
         let text_x = (x - text_width as f64 / 2.0).round() as i32;
@@ -662,8 +720,8 @@ mod tests {
         let igr = IntermediateGraph::from_ast(document).unwrap();
         let elements = ExcalidrawGenerator::generate(&igr).unwrap();
 
-        // Should have 2 nodes + 1 edge = 3 elements
-        assert_eq!(elements.len(), 3);
+        // Should have 2 nodes + 2 text elements + 1 edge = 5 elements
+        assert_eq!(elements.len(), 5);
 
         // Check node elements
         let node_elements: Vec<_> = elements

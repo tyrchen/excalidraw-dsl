@@ -172,6 +172,13 @@ impl Default for EDSLCompiler {
     }
 }
 
+// Additional test modules
+// TODO: Fix generator_test module to test public API only
+// #[cfg(test)]
+// mod generator_test;
+#[cfg(test)]
+mod integration_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;

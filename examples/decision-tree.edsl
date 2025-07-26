@@ -22,10 +22,10 @@ delegate[Delegate to Team]
 
 # Define the decision flow (acyclic)
 problem -> urgent
-urgent -> escalate{Yes}
-urgent -> complex{No}
-complex -> analyze{Yes}
-complex -> resources{No}
-resources -> quick_fix{Yes}
-resources -> schedule{No}
+urgent -> escalate: Yes
+urgent -> complex: No
+complex -> analyze: Yes
+complex -> resources: No
+resources -> quick_fix: Yes
+resources -> schedule: No
 analyze -> delegate
