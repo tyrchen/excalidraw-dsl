@@ -4,13 +4,7 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const Dialog = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<typeof DialogPrimitive.Root>
->(({ ...props }) => {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
-})
-Dialog.displayName = "Dialog"
+const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = React.forwardRef<
   HTMLButtonElement,
@@ -20,19 +14,13 @@ const DialogTrigger = React.forwardRef<
 })
 DialogTrigger.displayName = "DialogTrigger"
 
-const DialogPortal = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<typeof DialogPrimitive.Portal>
->(({ ...props }) => {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
-})
-DialogPortal.displayName = "DialogPortal"
+const DialogPortal = DialogPrimitive.Portal
 
 const DialogClose = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof DialogPrimitive.Close>
->(({ ...props }) => {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+>(({ ...props }, ref) => {
+  return <DialogPrimitive.Close data-slot="dialog-close" ref={ref} {...props} />
 })
 DialogClose.displayName = "DialogClose"
 

@@ -5,7 +5,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 
-pub trait LayoutEngine {
+pub trait LayoutEngine: Send + Sync {
     fn layout(&self, igr: &mut IntermediateGraph) -> Result<()>;
     fn name(&self) -> &'static str;
 }

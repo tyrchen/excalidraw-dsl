@@ -9,6 +9,9 @@ pub mod parser;
 #[cfg(feature = "llm")]
 pub mod llm;
 
+#[cfg(feature = "server")]
+pub mod server;
+
 pub use error::{EDSLError, Result};
 
 use crate::generator::ExcalidrawGenerator;
@@ -57,11 +60,11 @@ impl EDSLCompiler {
             optimizer.optimize_layout(&mut igr, edsl_source)?;
         }
 
-        // Generate Excalidraw elements
-        let elements = ExcalidrawGenerator::generate(&igr)?;
+        // Generate Excalidraw file
+        let file = ExcalidrawGenerator::generate_file(&igr)?;
 
         // Serialize to JSON
-        serde_json::to_string_pretty(&elements).map_err(|e| EDSLError::Json(e))
+        serde_json::to_string_pretty(&file).map_err(|e| EDSLError::Json(e))
     }
 
     /// Compile EDSL source code and return raw elements (without JSON serialization)
@@ -86,6 +89,71 @@ impl EDSLCompiler {
     pub fn validate(&self, edsl_source: &str) -> Result<()> {
         let parsed_doc = parse_edsl(edsl_source)?;
         let _igr = IntermediateGraph::from_ast(parsed_doc)?;
+        Ok(())
+    }
+
+    /// Validate Excalidraw JSON file format
+    pub fn validate_excalidraw(&self, json_content: &str) -> Result<()> {
+        use serde_json::Value;
+        
+        let value: Value = serde_json::from_str(json_content)
+            .map_err(|e| EDSLError::Json(e))?;
+        
+        // Check if it's an object (native Excalidraw format)
+        match &value {
+            Value::Object(map) => {
+                // Check for type field
+                if map.get("type").and_then(|v| v.as_str()) == Some("excalidraw") {
+                    // Validate elements array
+                    if let Some(Value::Array(elements)) = map.get("elements") {
+                        for (i, element) in elements.iter().enumerate() {
+                            Self::validate_excalidraw_element(element, i)?;
+                        }
+                    } else {
+                        return Err(EDSLError::Validation("Missing 'elements' array in Excalidraw format".into()));
+                    }
+                } else {
+                    return Err(EDSLError::Validation("Invalid Excalidraw format: missing or incorrect 'type' field".into()));
+                }
+            }
+            _ => {
+                return Err(EDSLError::Validation("Invalid Excalidraw format: expected object with type 'excalidraw'".into()));
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn validate_excalidraw_element(element: &serde_json::Value, index: usize) -> Result<()> {
+        let obj = element.as_object()
+            .ok_or_else(|| EDSLError::Validation(format!("Element {} is not an object", index)))?;
+        
+        // Required fields
+        let required_fields = ["type", "id", "x", "y"];
+        for field in &required_fields {
+            if !obj.contains_key(*field) {
+                return Err(EDSLError::Validation(format!("Element {} missing required field '{}'", index, field)));
+            }
+        }
+        
+        // Validate element type
+        if let Some(type_val) = obj.get("type").and_then(|v| v.as_str()) {
+            match type_val {
+                "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "text" => {},
+                _ => return Err(EDSLError::Validation(format!("Element {} has invalid type '{}'", index, type_val))),
+            }
+        }
+        
+        // Validate numeric fields
+        let numeric_fields = ["x", "y", "width", "height", "angle", "strokeWidth", "opacity", "fontSize"];
+        for field in &numeric_fields {
+            if let Some(val) = obj.get(*field) {
+                if !val.is_number() {
+                    return Err(EDSLError::Validation(format!("Element {} field '{}' must be a number", index, field)));
+                }
+            }
+        }
+        
         Ok(())
     }
 

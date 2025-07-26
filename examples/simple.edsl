@@ -4,11 +4,18 @@ theme: light
 ---
 
 # Simple three-tier architecture example
-user[User] -> web[Web Server] -> db[Database] {
+
+# Define nodes first
+user[User]
+web[Web Server]
+db[Database] {
   shape: cylinder;
   fill: hachure;
   strokeColor: "#343a40";
 }
+
+# Then define connections
+user -> web -> db
 
 # Container example
 container "Backend Services" as backend {
@@ -26,4 +33,4 @@ container "Backend Services" as backend {
 }
 
 # Connect to backend
-web -> backend.api
+web -> api

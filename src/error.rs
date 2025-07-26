@@ -27,6 +27,9 @@ pub enum EDSLError {
 
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 #[derive(Error, Debug)]

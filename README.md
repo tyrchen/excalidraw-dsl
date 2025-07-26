@@ -145,21 +145,85 @@ frontend -> backend.api_gateway;
 
 ## CLI Usage
 
+The `edsl` command provides several subcommands for different workflows:
+
+### Convert (Compile)
+
+Convert EDSL files to Excalidraw JSON:
+
 ```bash
-# Basic compilation
-edsl input.edsl
+# Basic conversion (outputs to input.json)
+edsl convert diagram.edsl
 
 # Specify output file
-edsl input.edsl -o output.json
+edsl convert diagram.edsl -o output.json
 
 # Choose layout algorithm
-edsl input.edsl -l force
-
-# Validate syntax only
-edsl input.edsl --validate
+edsl convert diagram.edsl --layout force
 
 # Verbose output
-edsl input.edsl -v
+edsl convert diagram.edsl -v
+
+# Alias: compile
+edsl compile diagram.edsl
+```
+
+### Validate
+
+Check EDSL syntax without generating output:
+
+```bash
+# Validate syntax
+edsl validate diagram.edsl
+
+# Verbose validation (shows element counts)
+edsl validate diagram.edsl -v
+```
+
+### Watch
+
+Watch EDSL file for changes and recompile automatically:
+
+```bash
+# Watch and auto-compile
+edsl watch diagram.edsl
+
+# Specify output file
+edsl watch diagram.edsl -o output.json
+
+# Verbose mode
+edsl watch diagram.edsl -v
+```
+
+### Server
+
+Run HTTP/WebSocket server for real-time compilation:
+
+```bash
+# Start server on default port (3002)
+edsl server
+
+# Specify port
+edsl server --port 8080
+
+# Specify host
+edsl server --host 127.0.0.1
+
+# Verbose logging
+edsl server -v
+```
+
+### Usage Examples
+
+```bash
+# Convert all examples
+make examples
+
+# Run server and UI together
+make run-full
+
+# Install globally
+cargo install --path . --features server
 ```
 
 ## Library Usage

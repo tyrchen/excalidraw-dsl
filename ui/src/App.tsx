@@ -1,32 +1,146 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useEDSLStore } from './store/edsl-store';
+import { EdslEditor } from './components/EdslEditor';
+import { ExcalidrawPreview } from './components/ExcalidrawPreview';
+import { FileManager } from './components/FileManager';
+import { SettingsPanel } from './components/SettingsPanel';
+import { Button } from './components/ui/button';
+import { PanelLeftOpen, PanelLeftClose, Settings, Eye, EyeOff } from 'lucide-react';
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { showPreview, currentFile, editorContent } = useEDSLStore();
+  const [showFileManager, setShowFileManager] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Initialize with a default file if no files exist
+  useEffect(() => {
+    const { files, addFile, setCurrentFile } = useEDSLStore.getState();
+    
+    if (files.length === 0) {
+      const defaultFile = {
+        name: 'example.edsl',
+        content: `---
+layout: dagre
+---
+
+# Example EDSL Diagram
+start[Start] -> process[Process Data]
+process -> decision{Decision?}
+decision -> yes[Yes Path] -> end[End]
+decision -> no[No Path] -> process`,
+        lastModified: new Date(),
+      };
+      
+      addFile(defaultFile);
+      setCurrentFile(defaultFile);
+    }
+  }, []);
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark' : ''}`}>
-      <div className="bg-background text-foreground">
-        {/* Hero Section */}
-        <div className="container mx-auto px-4 py-16">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              Welcome to Our Platform
-            </h1>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
-              A modern solution for all your needs. Built with React, TypeScript, and Tailwind CSS.
-            </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="rounded-md bg-primary px-3.5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-              >
-                Toggle Theme
-              </button>
-              <a href="#" className="text-sm font-semibold leading-6">
-                Learn more <span aria-hidden="true">→</span>
-              </a>
+    <div className="h-screen bg-gray-100 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="h-14 bg-white border-b flex items-center justify-between px-4 flex-shrink-0">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-xl font-bold text-gray-900">
+            ExcaliDraw DSL Editor
+          </h1>
+          {currentFile && (
+            <span className="text-sm text-gray-500">
+              {currentFile.name}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFileManager(!showFileManager)}
+            title={showFileManager ? 'Hide file manager' : 'Show file manager'}
+          >
+            {showFileManager ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSettings(!showSettings)}
+            title={showSettings ? 'Hide settings' : 'Show settings'}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* File Manager Sidebar */}
+        {showFileManager && (
+          <div className="w-80 flex-shrink-0">
+            <FileManager />
+          </div>
+        )}
+
+        {/* Editor and Preview */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Editor */}
+          <div className={`${showPreview ? 'w-1/2' : 'w-full'} flex flex-col border-r`}>
+            <div className="h-full bg-white">
+              <EdslEditor />
             </div>
           </div>
+
+          {/* Preview */}
+          {showPreview && (
+            <div className="w-1/2 flex flex-col bg-white">
+              <div className="h-12 border-b flex items-center justify-between px-4 bg-gray-50">
+                <h2 className="text-sm font-semibold text-gray-700">Preview</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => useEDSLStore.getState().setShowPreview(false)}
+                  title="Hide preview"
+                >
+                  <EyeOff className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <ExcalidrawPreview />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Settings Sidebar */}
+        {showSettings && (
+          <div className="w-80 flex-shrink-0">
+            <SettingsPanel />
+          </div>
+        )}
+      </div>
+
+      {/* Status Bar */}
+      <div className="h-8 bg-gray-800 text-white text-xs flex items-center justify-between px-4 flex-shrink-0">
+        <div className="flex items-center space-x-4">
+          <span>EDSL Editor v1.0</span>
+          {currentFile && (
+            <span>{editorContent.split('\n').length} lines</span>
+          )}
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {!showPreview && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => useEDSLStore.getState().setShowPreview(true)}
+              className="h-6 text-xs text-white hover:text-gray-300"
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Show Preview
+            </Button>
+          )}
+          <span>Ready</span>
         </div>
       </div>
     </div>

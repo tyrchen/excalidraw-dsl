@@ -21,8 +21,8 @@ edge_def = { edge_chain | single_edge }
 edge_chain = { node_ref ~ (arrow ~ node_ref)+ ~ edge_label? ~ style_block? }
 single_edge = { node_ref ~ arrow ~ node_ref ~ edge_label? ~ style_block? }
 node_ref = { id ~ label? }
-edge_label = { ":" ~ " "? ~ edge_label_content }
-edge_label_content = @{ string_literal | (!NEWLINE ~ !";" ~ !"{" ~ ANY)+ }
+edge_label = { (":" ~ " "? ~ edge_label_content) | ("{" ~ edge_label_content ~ "}") }
+edge_label_content = @{ string_literal | (!NEWLINE ~ !";" ~ !"{" ~ !"}" ~ ANY)+ }
 arrow = { "->" | "--" | "<->" | "~>" }
 
 // Container definitions

@@ -7,14 +7,33 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ExcalidrawFile {
+    pub r#type: String,
+    pub version: u32,
+    pub source: String,
+    pub elements: Vec<ExcalidrawElementSkeleton>,
+    #[serde(rename = "appState")]
+    pub app_state: AppState,
+    pub files: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppState {
+    #[serde(rename = "gridSize")]
+    pub grid_size: Option<u32>,
+    #[serde(rename = "viewBackgroundColor")]
+    pub view_background_color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ExcalidrawElementSkeleton {
     pub r#type: String,
     pub id: String,
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-    pub angle: f64,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub angle: i32,
     #[serde(rename = "strokeColor")]
     pub stroke_color: String,
     #[serde(rename = "backgroundColor")]
@@ -22,15 +41,15 @@ pub struct ExcalidrawElementSkeleton {
     #[serde(rename = "fillStyle")]
     pub fill_style: String,
     #[serde(rename = "strokeWidth")]
-    pub stroke_width: f64,
+    pub stroke_width: i32,
     #[serde(rename = "strokeStyle")]
     pub stroke_style: String,
     pub roughness: u8,
-    pub opacity: f64,
+    pub opacity: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(rename = "fontSize")]
-    pub font_size: f64,
+    pub font_size: i32,
     #[serde(rename = "fontFamily")]
     pub font_family: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -42,37 +61,138 @@ pub struct ExcalidrawElementSkeleton {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_arrowhead: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub points: Option<Vec<[f64; 2]>>,
+    pub points: Option<Vec<[i32; 2]>>,
+    pub seed: i32,
+    pub version: i32,
+    #[serde(rename = "versionNonce")]
+    pub version_nonce: i32,
+    #[serde(rename = "isDeleted")]
+    pub is_deleted: bool,
+    #[serde(rename = "groupIds")]
+    pub group_ids: Vec<String>,
+    #[serde(rename = "frameId")]
+    pub frame_id: Option<String>,
+    pub roundness: Option<serde_json::Value>,
+    #[serde(rename = "boundElements")]
+    pub bound_elements: Vec<serde_json::Value>,
+    pub updated: u64,
+    pub link: Option<String>,
+    pub locked: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "containerId")]
+    pub container_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "textAlign")]
+    pub text_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "verticalAlign")]
+    pub vertical_align: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ElementBinding {
     #[serde(rename = "elementId")]
     pub element_id: String,
-    pub focus: f64,
-    pub gap: f64,
+    pub focus: i32,
+    pub gap: i32,
 }
 
 pub struct ExcalidrawGenerator;
 
 impl ExcalidrawGenerator {
+    pub fn generate_file(igr: &IntermediateGraph) -> Result<ExcalidrawFile> {
+        let elements = Self::generate(igr)?;
+
+        Ok(ExcalidrawFile {
+            r#type: "excalidraw".to_string(),
+            version: 2,
+            source: "https://excalidraw-dsl.com".to_string(),
+            elements,
+            app_state: AppState {
+                grid_size: None,
+                view_background_color: "#ffffff".to_string(),
+            },
+            files: serde_json::json!({}),
+        })
+    }
+
     pub fn generate(igr: &IntermediateGraph) -> Result<Vec<ExcalidrawElementSkeleton>> {
         let mut elements = Vec::new();
         let mut node_id_map = std::collections::HashMap::new();
 
         // Generate container elements first (background rectangles)
         for container in &igr.containers {
-            if let Some(container_element) = Self::generate_container(container)? {
-                elements.push(container_element);
+            if let Some(mut container_element) = Self::generate_container(container)? {
+                let container_id = container_element.id.clone();
+                
+                // Generate text element for container if it has a label
+                if let Some(label) = &container.label {
+                    if !label.is_empty() {
+                        if let Some(bounds) = &container.bounds {
+                            let text_element = Self::generate_text_element(
+                                label,
+                                bounds.x + bounds.width / 2.0,
+                                bounds.y + 20.0, // Place text near top of container
+                                &container_id,
+                                container.attributes.font_size.unwrap_or(16.0),
+                                &container.attributes.font,
+                            )?;
+                            
+                            // Add reference to text element in the container's boundElements
+                            container_element.bound_elements.push(serde_json::json!({
+                                "id": text_element.id.clone(),
+                                "type": "text"
+                            }));
+                            
+                            elements.push(container_element);
+                            elements.push(text_element);
+                        } else {
+                            elements.push(container_element);
+                        }
+                    } else {
+                        elements.push(container_element);
+                    }
+                } else {
+                    elements.push(container_element);
+                }
             }
         }
 
         // Generate node elements
         for (_, node_data) in igr.graph.node_references() {
             let element_id = format!("node_{}", Uuid::new_v4());
-            let element = Self::generate_node(node_data, &element_id)?;
+            let mut element = Self::generate_node(node_data, &element_id)?;
             node_id_map.insert(node_data.id.clone(), element_id.clone());
-            elements.push(element);
+            
+            // Remove text from shape element (it will be a separate element)
+            let label = element.text.take();
+            
+            // Generate separate text element for node label
+            if let Some(label) = label {
+                if !label.is_empty() {
+                    let text_element = Self::generate_text_element(
+                        &label,
+                        node_data.x,
+                        node_data.y,
+                        &element_id,
+                        node_data.attributes.font_size.unwrap_or(20.0),
+                        &node_data.attributes.font,
+                    )?;
+                    
+                    // Add reference to text element in the shape's boundElements
+                    element.bound_elements.push(serde_json::json!({
+                        "id": text_element.id.clone(),
+                        "type": "text"
+                    }));
+                    
+                    elements.push(element);
+                    elements.push(text_element);
+                } else {
+                    elements.push(element);
+                }
+            } else {
+                elements.push(element);
+            }
         }
 
         // Generate edge elements
@@ -134,11 +254,11 @@ impl ExcalidrawGenerator {
         Ok(ExcalidrawElementSkeleton {
             r#type: shape_type.to_string(),
             id: element_id.to_string(),
-            x: node_data.x - node_data.width / 2.0,
-            y: node_data.y - node_data.height / 2.0,
-            width: node_data.width,
-            height: node_data.height,
-            angle: 0.0,
+            x: (node_data.x - node_data.width / 2.0).round() as i32,
+            y: (node_data.y - node_data.height / 2.0).round() as i32,
+            width: node_data.width.round() as i32,
+            height: node_data.height.round() as i32,
+            angle: 0,
             stroke_color: node_data
                 .attributes
                 .stroke_color
@@ -150,22 +270,45 @@ impl ExcalidrawGenerator {
                 .clone()
                 .unwrap_or_else(|| "transparent".to_string()),
             fill_style: Self::convert_fill_style(&node_data.attributes.fill_style),
-            stroke_width: node_data.attributes.stroke_width.unwrap_or(2.0),
+            stroke_width: node_data.attributes.stroke_width.unwrap_or(2.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&node_data.attributes.stroke_style),
             roughness: node_data.attributes.roughness.unwrap_or(1),
-            opacity: 100.0,
+            opacity: 100,
             text: if node_data.label.is_empty() {
                 None
             } else {
                 Some(node_data.label.clone())
             },
-            font_size: node_data.attributes.font_size.unwrap_or(20.0),
+            font_size: node_data.attributes.font_size.unwrap_or(20.0).round() as i32,
             font_family: Self::convert_font_family(&node_data.attributes.font),
             start_binding: None,
             end_binding: None,
             start_arrowhead: None,
             end_arrowhead: None,
             points: None,
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: if shape_type == "rectangle" {
+                Some(serde_json::json!({"type": 3}))
+            } else if shape_type == "ellipse" {
+                Some(serde_json::json!({"type": 2}))
+            } else {
+                None
+            },
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: None,
+            text_align: None,
+            vertical_align: None,
         })
     }
 
@@ -198,11 +341,11 @@ impl ExcalidrawGenerator {
         Ok(ExcalidrawElementSkeleton {
             r#type: element_type.to_string(),
             id: format!("edge_{}", Uuid::new_v4()),
-            x: start_point.0,
-            y: start_point.1,
-            width: end_point.0 - start_point.0,
-            height: end_point.1 - start_point.1,
-            angle: 0.0,
+            x: start_point.0.round() as i32,
+            y: start_point.1.round() as i32,
+            width: (end_point.0 - start_point.0).round() as i32,
+            height: (end_point.1 - start_point.1).round() as i32,
+            angle: 0,
             stroke_color: edge_data
                 .attributes
                 .stroke_color
@@ -210,24 +353,28 @@ impl ExcalidrawGenerator {
                 .unwrap_or_else(|| "#000000".to_string()),
             background_color: "transparent".to_string(),
             fill_style: "solid".to_string(),
-            stroke_width: edge_data.attributes.stroke_width.unwrap_or(2.0),
+            stroke_width: edge_data.attributes.stroke_width.unwrap_or(2.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&edge_data.attributes.stroke_style),
             roughness: edge_data.attributes.roughness.unwrap_or(1),
-            opacity: 100.0,
+            opacity: 100,
             text: edge_data.label.clone(),
-            font_size: 16.0,
+            font_size: 16,
             font_family: 1, // Virgil
             start_binding: Some(ElementBinding {
                 element_id: source_element_id.to_string(),
-                focus: 0.0,
-                gap: 0.0,
+                focus: 0,
+                gap: 0,
             }),
             end_binding: Some(ElementBinding {
                 element_id: target_element_id.to_string(),
-                focus: 0.0,
-                gap: 0.0,
+                focus: 0,
+                gap: 0,
             }),
-            start_arrowhead: Self::convert_arrowhead(&edge_data.attributes.start_arrowhead),
+            start_arrowhead: Self::convert_arrowhead(&edge_data.attributes.start_arrowhead)
+                .or_else(|| match edge_data.arrow_type {
+                    ArrowType::DoubleArrow => Some("triangle".to_string()),
+                    _ => None,
+                }),
             end_arrowhead: Self::convert_arrowhead(&edge_data.attributes.end_arrowhead).or_else(
                 || match edge_data.arrow_type {
                     ArrowType::SingleArrow => Some("triangle".to_string()),
@@ -236,9 +383,29 @@ impl ExcalidrawGenerator {
                 },
             ),
             points: Some(vec![
-                [0.0, 0.0],
-                [end_point.0 - start_point.0, end_point.1 - start_point.1],
+                [0, 0],
+                [
+                    (end_point.0 - start_point.0).round() as i32,
+                    (end_point.1 - start_point.1).round() as i32,
+                ],
             ]),
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: Some(serde_json::json!({"type": 2})),
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: None,
+            text_align: None,
+            vertical_align: None,
         })
     }
 
@@ -251,11 +418,11 @@ impl ExcalidrawGenerator {
         Ok(Some(ExcalidrawElementSkeleton {
             r#type: "rectangle".to_string(),
             id: format!("container_{}", Uuid::new_v4()),
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-            angle: 0.0,
+            x: bounds.x.round() as i32,
+            y: bounds.y.round() as i32,
+            width: bounds.width.round() as i32,
+            height: bounds.height.round() as i32,
+            angle: 0,
             stroke_color: container
                 .attributes
                 .stroke_color
@@ -267,18 +434,35 @@ impl ExcalidrawGenerator {
                 .clone()
                 .unwrap_or_else(|| "#f8f9fa".to_string()),
             fill_style: Self::convert_fill_style(&container.attributes.fill_style),
-            stroke_width: container.attributes.stroke_width.unwrap_or(1.0),
+            stroke_width: container.attributes.stroke_width.unwrap_or(1.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&container.attributes.stroke_style),
             roughness: container.attributes.roughness.unwrap_or(0),
-            opacity: 50.0, // Semi-transparent background
-            text: container.label.clone(),
-            font_size: container.attributes.font_size.unwrap_or(16.0),
+            opacity: 50, // Semi-transparent background
+            text: None, // Text will be a separate element
+            font_size: container.attributes.font_size.unwrap_or(16.0).round() as i32,
             font_family: Self::convert_font_family(&container.attributes.font),
             start_binding: None,
             end_binding: None,
             start_arrowhead: None,
             end_arrowhead: None,
             points: None,
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: Some(serde_json::json!({"type": 3})),
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: None,
+            text_align: None,
+            vertical_align: None,
         }))
     }
 
@@ -310,6 +494,65 @@ impl ExcalidrawGenerator {
             Some("Cascadia") => 3,
             _ => 1, // Default to Virgil
         }
+    }
+
+    fn generate_text_element(
+        text: &str,
+        x: f64,
+        y: f64,
+        container_id: &str,
+        font_size: f64,
+        font: &Option<String>,
+    ) -> Result<ExcalidrawElementSkeleton> {
+        // Estimate text width and height
+        let text_width = (text.len() as f64 * font_size * 0.6).round() as i32;
+        let text_height = font_size.round() as i32;
+        
+        // Center the text relative to the given position
+        let text_x = (x - text_width as f64 / 2.0).round() as i32;
+        let text_y = (y - text_height as f64 / 2.0).round() as i32;
+        
+        Ok(ExcalidrawElementSkeleton {
+            r#type: "text".to_string(),
+            id: format!("text_{}", Uuid::new_v4()),
+            x: text_x,
+            y: text_y,
+            width: text_width,
+            height: text_height,
+            angle: 0,
+            stroke_color: "#000000".to_string(),
+            background_color: "transparent".to_string(),
+            fill_style: "solid".to_string(),
+            stroke_width: 0,
+            stroke_style: "solid".to_string(),
+            roughness: 0,
+            opacity: 100,
+            text: Some(text.to_string()),
+            font_size: font_size.round() as i32,
+            font_family: Self::convert_font_family(font),
+            start_binding: None,
+            end_binding: None,
+            start_arrowhead: None,
+            end_arrowhead: None,
+            points: None,
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: None,
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: Some(container_id.to_string()),
+            text_align: Some("center".to_string()),
+            vertical_align: Some("middle".to_string()),
+        })
     }
 
     fn calculate_connection_point(
@@ -384,10 +627,10 @@ mod tests {
 
         assert_eq!(result.r#type, "rectangle");
         assert_eq!(result.text, Some("Test Node".to_string()));
-        assert_eq!(result.x, 40.0); // 100 - 60 (half width)
-        assert_eq!(result.y, 70.0); // 100 - 30 (half height)
-        assert_eq!(result.width, 120.0);
-        assert_eq!(result.height, 60.0);
+        assert_eq!(result.x, 40); // 100 - 60 (half width)
+        assert_eq!(result.y, 70); // 100 - 30 (half height)
+        assert_eq!(result.width, 120);
+        assert_eq!(result.height, 60);
     }
 
     #[test]
