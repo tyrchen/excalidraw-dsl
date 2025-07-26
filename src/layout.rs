@@ -534,14 +534,13 @@ impl DagreLayout {
 
         // DFS to calculate ranks
         for node in starting_nodes {
-            self.dfs_rank(igr, node, &mut ranks, &mut visited);
+            Self::dfs_rank(igr, node, &mut ranks, &mut visited);
         }
 
         Ok(ranks)
     }
 
     fn dfs_rank(
-        &self,
         igr: &IntermediateGraph,
         node: NodeIndex,
         ranks: &mut HashMap<NodeIndex, i32>,
@@ -561,7 +560,7 @@ impl DagreLayout {
                 let target = edge.target();
                 // Edge weight (min length) is 1 by default
                 let edge_weight = 1;
-                self.dfs_rank(igr, target, ranks, visited) - edge_weight
+                Self::dfs_rank(igr, target, ranks, visited) - edge_weight
             })
             .collect();
 
@@ -627,7 +626,7 @@ impl DagreLayout {
     fn sort_layer_by_barycenter(
         &self,
         igr: &IntermediateGraph,
-        layer: &mut Vec<NodeIndex>,
+        layer: &mut [NodeIndex],
         reference_layer: &[NodeIndex],
         forward: bool,
     ) {
@@ -685,7 +684,7 @@ impl DagreLayout {
         });
 
         // Apply the new ordering
-        let original_layer = layer.clone();
+        let original_layer = layer.to_owned();
         for (i, &idx) in sorted_indices.iter().enumerate() {
             layer[i] = original_layer[idx];
         }

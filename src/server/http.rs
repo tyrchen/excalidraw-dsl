@@ -296,25 +296,23 @@ async fn list_files_handler(Query(query): Query<FileListQuery>) -> Response {
         Ok(entries) => {
             let mut files = Vec::new();
 
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("edsl") {
-                        if let Ok(metadata) = entry.metadata() {
-                            let modified = metadata
-                                .modified()
-                                .unwrap_or(SystemTime::UNIX_EPOCH)
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("edsl") {
+                    if let Ok(metadata) = entry.metadata() {
+                        let modified = metadata
+                            .modified()
+                            .unwrap_or(SystemTime::UNIX_EPOCH)
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
 
-                            files.push(FileInfo {
-                                name: entry.file_name().to_string_lossy().to_string(),
-                                path: path.to_string_lossy().to_string(),
-                                size: metadata.len(),
-                                modified,
-                            });
-                        }
+                        files.push(FileInfo {
+                            name: entry.file_name().to_string_lossy().to_string(),
+                            path: path.to_string_lossy().to_string(),
+                            size: metadata.len(),
+                            modified,
+                        });
                     }
                 }
             }

@@ -205,13 +205,13 @@ fn parse_component_type(pair: pest::iterators::Pair<Rule>) -> Result<ComponentTy
                                 style.stroke_width = Some(*n);
                             }
                             if let Some(AttributeValue::String(s)) = attrs.get("strokeStyle") {
-                                style.stroke_style = StrokeStyle::from_str(s);
+                                style.stroke_style = s.parse().ok();
                             }
                             if let Some(AttributeValue::Number(n)) = attrs.get("rounded") {
                                 style.rounded = Some(*n);
                             }
                             if let Some(AttributeValue::String(s)) = attrs.get("fillStyle") {
-                                style.fill_style = FillStyle::from_str(s);
+                                style.fill_style = s.parse().ok();
                             }
                             if let Some(AttributeValue::Number(n)) = attrs.get("roughness") {
                                 style.roughness = Some(*n as u8);
@@ -333,8 +333,10 @@ fn parse_single_edge(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition
                 }
             }
             Rule::arrow => {
-                arrow_type =
-                    ArrowType::from_str(inner_pair.as_str()).unwrap_or(ArrowType::SingleArrow);
+                arrow_type = inner_pair
+                    .as_str()
+                    .parse()
+                    .unwrap_or(ArrowType::SingleArrow);
             }
             Rule::edge_label => {
                 for label_part in inner_pair.into_inner() {
@@ -380,8 +382,10 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
                 ids.push(node_id);
             }
             Rule::arrow => {
-                arrow_type =
-                    ArrowType::from_str(inner_pair.as_str()).unwrap_or(ArrowType::SingleArrow);
+                arrow_type = inner_pair
+                    .as_str()
+                    .parse()
+                    .unwrap_or(ArrowType::SingleArrow);
             }
             Rule::edge_label => {
                 for label_part in inner_pair.into_inner() {

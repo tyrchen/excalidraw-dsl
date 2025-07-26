@@ -75,6 +75,7 @@ ignore = [
   #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
   #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
   #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
+  { id = "RUSTSEC-2020-0016", reason = "net2 is deprecated but used by notify v4.0.18 - will upgrade notify to fix this" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -92,16 +93,14 @@ ignore = [
 allow = [
   "MIT",
   "Apache-2.0",
-  "Unicode-DFS-2016",
-  "MPL-2.0",
   "BSD-2-Clause",
   "BSD-3-Clause",
   "ISC",
   "CC0-1.0",
   "Unicode-3.0",
   "BSL-1.0",
-  "OpenSSL",
   "Zlib",
+  "CDLA-Permissive-2.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the

@@ -536,7 +536,7 @@ impl ExcalidrawAttributes {
                 }
                 "strokeStyle" => {
                     if let Some(s) = value.as_string() {
-                        excalidraw_attrs.stroke_style = StrokeStyle::from_str(s);
+                        excalidraw_attrs.stroke_style = s.parse().ok();
                     }
                 }
                 "backgroundColor" => {
@@ -546,7 +546,7 @@ impl ExcalidrawAttributes {
                 }
                 "fill" => {
                     if let Some(s) = value.as_string() {
-                        excalidraw_attrs.fill_style = FillStyle::from_str(s);
+                        excalidraw_attrs.fill_style = s.parse().ok();
                     }
                 }
                 "fillWeight" => {
@@ -579,12 +579,12 @@ impl ExcalidrawAttributes {
                 }
                 "startArrowhead" => {
                     if let Some(s) = value.as_string() {
-                        excalidraw_attrs.start_arrowhead = ArrowheadType::from_str(s);
+                        excalidraw_attrs.start_arrowhead = s.parse().ok();
                     }
                 }
                 "endArrowhead" => {
                     if let Some(s) = value.as_string() {
-                        excalidraw_attrs.end_arrowhead = ArrowheadType::from_str(s);
+                        excalidraw_attrs.end_arrowhead = s.parse().ok();
                     }
                 }
                 "rounded" => {

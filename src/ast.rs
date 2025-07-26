@@ -1,6 +1,7 @@
 // src/ast.rs
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GlobalConfig {
@@ -176,17 +177,21 @@ pub enum StrokeStyle {
     Dotted,
 }
 
-impl ArrowType {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for ArrowType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "->" => Some(ArrowType::SingleArrow),
-            "--" => Some(ArrowType::Line),
-            "<->" => Some(ArrowType::DoubleArrow),
-            "~>" => Some(ArrowType::WavyArrow),
-            _ => None,
+            "->" => Ok(ArrowType::SingleArrow),
+            "--" => Ok(ArrowType::Line),
+            "<->" => Ok(ArrowType::DoubleArrow),
+            "~>" => Ok(ArrowType::WavyArrow),
+            _ => Err(()),
         }
     }
+}
 
+impl ArrowType {
     pub fn to_excalidraw_type(&self) -> &'static str {
         match self {
             ArrowType::SingleArrow => "arrow",
@@ -197,16 +202,20 @@ impl ArrowType {
     }
 }
 
-impl StrokeStyle {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for StrokeStyle {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "solid" => Some(StrokeStyle::Solid),
-            "dotted" => Some(StrokeStyle::Dotted),
-            "dashed" => Some(StrokeStyle::Dashed),
-            _ => None,
+            "solid" => Ok(StrokeStyle::Solid),
+            "dotted" => Ok(StrokeStyle::Dotted),
+            "dashed" => Ok(StrokeStyle::Dashed),
+            _ => Err(()),
         }
     }
+}
 
+impl StrokeStyle {
     pub fn to_excalidraw_style(&self) -> &'static str {
         match self {
             StrokeStyle::Solid => "solid",
@@ -224,17 +233,21 @@ pub enum FillStyle {
     CrossHatch,
 }
 
-impl FillStyle {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for FillStyle {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "none" => Some(FillStyle::None),
-            "solid" => Some(FillStyle::Solid),
-            "hachure" => Some(FillStyle::Hachure),
-            "cross-hatch" => Some(FillStyle::CrossHatch),
-            _ => None,
+            "none" => Ok(FillStyle::None),
+            "solid" => Ok(FillStyle::Solid),
+            "hachure" => Ok(FillStyle::Hachure),
+            "cross-hatch" => Ok(FillStyle::CrossHatch),
+            _ => Err(()),
         }
     }
+}
 
+impl FillStyle {
     pub fn to_excalidraw_style(&self) -> &'static str {
         match self {
             FillStyle::None => "none",
@@ -253,17 +266,21 @@ pub enum ArrowheadType {
     Diamond,
 }
 
-impl ArrowheadType {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for ArrowheadType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "none" => Some(ArrowheadType::None),
-            "triangle" => Some(ArrowheadType::Triangle),
-            "dot" => Some(ArrowheadType::Dot),
-            "diamond" => Some(ArrowheadType::Diamond),
-            _ => None,
+            "none" => Ok(ArrowheadType::None),
+            "triangle" => Ok(ArrowheadType::Triangle),
+            "dot" => Ok(ArrowheadType::Dot),
+            "diamond" => Ok(ArrowheadType::Diamond),
+            _ => Err(()),
         }
     }
+}
 
+impl ArrowheadType {
     pub fn to_excalidraw_type(&self) -> Option<&'static str> {
         match self {
             ArrowheadType::None => None,

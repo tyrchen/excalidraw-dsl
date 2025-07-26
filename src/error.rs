@@ -1,4 +1,7 @@
 // src/error.rs
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::result_large_err)]
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

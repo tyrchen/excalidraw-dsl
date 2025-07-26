@@ -1,4 +1,7 @@
 // src/lib.rs
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::result_large_err)]
+
 pub mod ast;
 pub mod error;
 pub mod generator;
