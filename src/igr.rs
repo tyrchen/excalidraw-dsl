@@ -7,7 +7,9 @@ use std::collections::HashMap;
 pub struct IntermediateGraph {
     pub graph: DiGraph<NodeData, EdgeData>,
     pub global_config: GlobalConfig,
+    pub component_types: HashMap<String, ComponentTypeDefinition>,
     pub containers: Vec<ContainerData>,
+    pub groups: Vec<GroupData>,
     pub node_map: HashMap<String, NodeIndex>,
 }
 
@@ -40,6 +42,16 @@ pub struct ContainerData {
 }
 
 #[derive(Debug, Clone)]
+pub struct GroupData {
+    pub id: String,
+    pub label: Option<String>,
+    pub group_type: GroupType,
+    pub children: Vec<NodeIndex>,
+    pub attributes: ExcalidrawAttributes,
+    pub bounds: Option<BoundingBox>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ExcalidrawAttributes {
     // Shape properties
     pub shape: Option<String>,
@@ -60,6 +72,7 @@ pub struct ExcalidrawAttributes {
     pub roughness: Option<u8>,
     pub font: Option<String>,
     pub font_size: Option<f64>,
+    pub rounded: Option<f64>,
 
     // Arrow properties
     pub start_arrowhead: Option<ArrowheadType>,
@@ -89,6 +102,7 @@ impl Default for ExcalidrawAttributes {
             roughness: None,
             font: None,
             font_size: None,
+            rounded: None,
             start_arrowhead: None,
             end_arrowhead: None,
         }
@@ -100,7 +114,9 @@ impl IntermediateGraph {
         Self {
             graph: DiGraph::new(),
             global_config: GlobalConfig::default(),
+            component_types: HashMap::new(),
             containers: Vec::new(),
+            groups: Vec::new(),
             node_map: HashMap::new(),
         }
     }
@@ -108,8 +124,9 @@ impl IntermediateGraph {
     pub fn from_ast(document: ParsedDocument) -> Result<Self> {
         let mut igr = IntermediateGraph::new();
         igr.global_config = document.config;
+        igr.component_types = document.component_types;
 
-        // First pass: Build all nodes from top-level and containers
+        // First pass: Build all nodes from top-level, containers, and groups
         let mut all_nodes = document.nodes;
         let mut all_edges = document.edges;
 
@@ -123,6 +140,26 @@ impl IntermediateGraph {
                         // Nested containers - for now just ignore
                         // TODO: Handle nested containers
                     }
+                    Statement::Group(_) => {
+                        // Nested groups - for now just ignore
+                        // TODO: Handle nested groups
+                    }
+                }
+            }
+        }
+
+        // Extract nodes and edges from groups
+        for group in &document.groups {
+            for statement in &group.internal_statements {
+                match statement {
+                    Statement::Node(node) => all_nodes.push(node.clone()),
+                    Statement::Edge(edge) => all_edges.push(edge.clone()),
+                    Statement::Container(_) => {
+                        // Nested containers - for now just ignore
+                    }
+                    Statement::Group(_) => {
+                        // Nested groups - for now just ignore
+                    }
                 }
             }
         }
@@ -133,7 +170,7 @@ impl IntermediateGraph {
                 return Err(BuildError::DuplicateNode(node_def.id).into());
             }
 
-            let node_data = NodeData::from_definition(node_def)?;
+            let node_data = NodeData::from_definition(node_def, &igr.component_types)?;
             let node_idx = igr.graph.add_node(node_data.clone());
             igr.node_map.insert(node_data.id.clone(), node_idx);
         }
@@ -159,6 +196,12 @@ impl IntermediateGraph {
             igr.containers.push(container_data);
         }
 
+        // Build groups
+        for group_def in document.groups {
+            let group_data = GroupData::from_definition(group_def, &igr.node_map)?;
+            igr.groups.push(group_data);
+        }
+
         Ok(igr)
     }
 
@@ -175,8 +218,50 @@ impl IntermediateGraph {
 }
 
 impl NodeData {
-    pub fn from_definition(def: NodeDefinition) -> Result<Self> {
-        let attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
+    pub fn from_definition(def: NodeDefinition, component_types: &HashMap<String, ComponentTypeDefinition>) -> Result<Self> {
+        let mut attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
+        
+        // Apply component type styling if specified
+        if let Some(type_name) = &def.component_type {
+            if let Some(comp_type) = component_types.get(type_name) {
+                // Apply component type styles
+                if let Some(shape) = &comp_type.shape {
+                    attributes.shape = Some(shape.clone());
+                }
+                
+                // Apply style from component type (with node-specific overrides)
+                if comp_type.style.fill.is_some() && attributes.background_color.is_none() {
+                    attributes.background_color = comp_type.style.fill.clone();
+                }
+                if comp_type.style.stroke_color.is_some() && attributes.stroke_color.is_none() {
+                    attributes.stroke_color = comp_type.style.stroke_color.clone();
+                }
+                if comp_type.style.stroke_width.is_some() && attributes.stroke_width.is_none() {
+                    attributes.stroke_width = comp_type.style.stroke_width;
+                }
+                if comp_type.style.stroke_style.is_some() && attributes.stroke_style.is_none() {
+                    attributes.stroke_style = comp_type.style.stroke_style.clone();
+                }
+                if comp_type.style.fill_style.is_some() && attributes.fill_style.is_none() {
+                    attributes.fill_style = comp_type.style.fill_style.clone();
+                }
+                if comp_type.style.roughness.is_some() && attributes.roughness.is_none() {
+                    attributes.roughness = comp_type.style.roughness;
+                }
+                if comp_type.style.font_size.is_some() && attributes.font_size.is_none() {
+                    attributes.font_size = comp_type.style.font_size;
+                }
+                if comp_type.style.font.is_some() && attributes.font.is_none() {
+                    attributes.font = comp_type.style.font.clone();
+                }
+                if comp_type.style.rounded.is_some() && attributes.rounded.is_none() {
+                    attributes.rounded = comp_type.style.rounded;
+                }
+            } else {
+                return Err(BuildError::UnknownComponentType(type_name.clone()).into());
+            }
+        }
+        
         let label = def.label.unwrap_or_else(|| def.id.clone());
 
         // Estimate initial dimensions based on label with better text metrics
@@ -289,6 +374,41 @@ impl ContainerData {
     }
 }
 
+impl GroupData {
+    pub fn from_definition(
+        def: GroupDefinition,
+        node_map: &HashMap<String, NodeIndex>,
+    ) -> Result<Self> {
+        let attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
+
+        // Resolve child node indices
+        let mut children = Vec::new();
+        for child_id in &def.children {
+            if let Some(&node_idx) = node_map.get(child_id) {
+                children.push(node_idx);
+            } else {
+                return Err(BuildError::UnknownNode(child_id.clone()).into());
+            }
+        }
+
+        if children.is_empty() {
+            return Err(BuildError::EmptyContainer(
+                def.id.clone()
+            )
+            .into());
+        }
+
+        Ok(GroupData {
+            id: def.id,
+            label: def.label,
+            group_type: def.group_type,
+            children,
+            attributes,
+            bounds: None,
+        })
+    }
+}
+
 impl ExcalidrawAttributes {
     pub fn from_hashmap(attrs: &HashMap<String, AttributeValue>) -> Result<Self> {
         let mut excalidraw_attrs = ExcalidrawAttributes::default();
@@ -373,6 +493,11 @@ impl ExcalidrawAttributes {
                         excalidraw_attrs.end_arrowhead = ArrowheadType::from_str(s);
                     }
                 }
+                "rounded" => {
+                    if let Some(n) = value.as_number() {
+                        excalidraw_attrs.rounded = Some(n);
+                    }
+                }
                 _ => {
                     // Unknown attribute - could log a warning here
                 }
@@ -391,15 +516,18 @@ mod tests {
     fn test_igr_from_simple_ast() {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
+            component_types: HashMap::new(),
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),
                     label: Some("Node A".to_string()),
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
                 NodeDefinition {
                     id: "b".to_string(),
                     label: Some("Node B".to_string()),
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
             ],
@@ -411,6 +539,7 @@ mod tests {
                 attributes: HashMap::new(),
             }],
             containers: vec![],
+            groups: vec![],
         };
 
         let igr = IntermediateGraph::from_ast(document).unwrap();
@@ -424,20 +553,24 @@ mod tests {
     fn test_duplicate_node_error() {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
+            component_types: HashMap::new(),
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),
                     label: None,
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
                 NodeDefinition {
                     id: "a".to_string(), // Duplicate!
                     label: None,
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
             ],
             edges: vec![],
             containers: vec![],
+            groups: vec![],
         };
 
         let result = IntermediateGraph::from_ast(document);

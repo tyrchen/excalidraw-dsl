@@ -1,6 +1,7 @@
 // src/layout.rs
 use crate::error::{LayoutError, Result};
 use crate::igr::{BoundingBox, IntermediateGraph};
+use crate::ast::GroupType;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use petgraph::Direction as PetDirection;
@@ -216,12 +217,17 @@ impl LayoutEngine for DagreLayout {
             return Ok(());
         }
 
-        // Improved layered layout algorithm based on layout-rust
-        let node_ranks = self.assign_ranks(igr)?;
-        let layers = self.build_layers(igr, &node_ranks);
-        let ordered_layers = self.minimize_crossings(igr, layers);
-        self.position_nodes(igr, &ordered_layers)?;
+        // Group-aware layout
+        if !igr.groups.is_empty() {
+            self.layout_with_groups(igr)?;
+        } else {
+            // Standard layout without groups
+            self.layout_standard(igr)?;
+        }
+
+        // Calculate bounds for containers and groups
         self.calculate_container_bounds(igr);
+        self.calculate_group_bounds(igr);
 
         Ok(())
     }
@@ -232,6 +238,222 @@ impl LayoutEngine for DagreLayout {
 }
 
 impl DagreLayout {
+    fn layout_standard(&self, igr: &mut IntermediateGraph) -> Result<()> {
+        // Standard layout algorithm
+        let node_ranks = self.assign_ranks(igr)?;
+        let layers = self.build_layers(igr, &node_ranks);
+        let ordered_layers = self.minimize_crossings(igr, layers);
+        self.position_nodes(igr, &ordered_layers)?;
+        Ok(())
+    }
+
+    fn layout_with_groups(&self, igr: &mut IntermediateGraph) -> Result<()> {
+        // Create a map of nodes to their group
+        let mut node_to_group: HashMap<NodeIndex, usize> = HashMap::new();
+        for (group_idx, group) in igr.groups.iter().enumerate() {
+            for &node_idx in &group.children {
+                node_to_group.insert(node_idx, group_idx);
+            }
+        }
+
+        // Layout each group independently
+        for (_group_idx, group) in igr.groups.iter().enumerate() {
+            if group.children.is_empty() {
+                continue;
+            }
+
+            // Create a subgraph for this group
+            let positions = self.layout_group_subgraph(igr, &group.children, &group.group_type)?;
+            
+            // Apply positions from subgraph layout
+            for (&node_idx, &(x, y)) in &positions {
+                let node = &mut igr.graph[node_idx];
+                node.x = x;
+                node.y = y;
+            }
+        }
+
+        // Layout ungrouped nodes
+        let ungrouped_nodes: Vec<NodeIndex> = igr.graph.node_indices()
+            .filter(|idx| !node_to_group.contains_key(idx))
+            .collect();
+
+        if !ungrouped_nodes.is_empty() {
+            self.layout_ungrouped_nodes(igr, &ungrouped_nodes)?;
+        }
+
+        // Adjust positions to ensure groups don't overlap
+        self.adjust_group_positions(igr);
+
+        Ok(())
+    }
+
+    fn layout_group_subgraph(
+        &self,
+        igr: &IntermediateGraph,
+        group_nodes: &[NodeIndex],
+        group_type: &GroupType,
+    ) -> Result<HashMap<NodeIndex, (f64, f64)>> {
+        let mut positions = HashMap::new();
+        
+        match group_type {
+            GroupType::FlowGroup => {
+                // Linear flow layout for flow groups
+                let mut x = 0.0;
+                let y = 0.0;
+                
+                for &node_idx in group_nodes {
+                    let node = &igr.graph[node_idx];
+                    positions.insert(node_idx, (x, y));
+                    x += node.width + self.options.node_sep * 1.5; // Extra spacing for flow
+                }
+            }
+            GroupType::BasicGroup | GroupType::SemanticGroup(_) => {
+                // Hierarchical layout for other groups
+                // Create internal edges only
+                let node_set: HashSet<NodeIndex> = group_nodes.iter().copied().collect();
+                let mut internal_edges = Vec::new();
+                
+                for &node_idx in group_nodes {
+                    for edge in igr.graph.edges_directed(node_idx, PetDirection::Outgoing) {
+                        if node_set.contains(&edge.target()) {
+                            internal_edges.push((node_idx, edge.target()));
+                        }
+                    }
+                }
+                
+                // Simple grid layout if no internal structure
+                if internal_edges.is_empty() {
+                    let cols = (group_nodes.len() as f64).sqrt().ceil() as usize;
+                    for (i, &node_idx) in group_nodes.iter().enumerate() {
+                        let row = i / cols;
+                        let col = i % cols;
+                        let node = &igr.graph[node_idx];
+                        
+                        let x = col as f64 * (node.width + self.options.node_sep);
+                        let y = row as f64 * (node.height + self.options.rank_sep);
+                        positions.insert(node_idx, (x, y));
+                    }
+                } else {
+                    // Use standard dagre for internal structure
+                    // This is simplified - in a full implementation, you'd run
+                    // the dagre algorithm on just this subgraph
+                    let mut x = 0.0;
+                    let mut y = 0.0;
+                    
+                    for &node_idx in group_nodes {
+                        let node = &igr.graph[node_idx];
+                        positions.insert(node_idx, (x, y));
+                        x += node.width + self.options.node_sep;
+                        if x > 400.0 { // Wrap after certain width
+                            x = 0.0;
+                            y += node.height + self.options.rank_sep;
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(positions)
+    }
+
+    fn layout_ungrouped_nodes(&self, igr: &mut IntermediateGraph, ungrouped_nodes: &[NodeIndex]) -> Result<()> {
+        // Simple vertical layout for ungrouped nodes
+        // In a full implementation, this would consider connections to groups
+        let mut y = 0.0;
+        
+        for &node_idx in ungrouped_nodes {
+            let node = &mut igr.graph[node_idx];
+            node.x = -200.0; // Place to the left of groups
+            node.y = y;
+            y += node.height + self.options.node_sep;
+        }
+        
+        Ok(())
+    }
+
+    fn adjust_group_positions(&self, igr: &mut IntermediateGraph) {
+        // Calculate bounds for each group
+        let mut group_bounds = Vec::new();
+        
+        for group in &igr.groups {
+            if group.children.is_empty() {
+                continue;
+            }
+            
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
+            
+            for &child_idx in &group.children {
+                let node = &igr.graph[child_idx];
+                min_x = min_x.min(node.x - node.width / 2.0);
+                max_x = max_x.max(node.x + node.width / 2.0);
+                min_y = min_y.min(node.y - node.height / 2.0);
+                max_y = max_y.max(node.y + node.height / 2.0);
+            }
+            
+            group_bounds.push((min_x, min_y, max_x, max_y));
+        }
+        
+        // Arrange groups to prevent overlap
+        let group_padding = 100.0;
+        let mut x_offset = 0.0;
+        
+        for (group_idx, (min_x, _min_y, max_x, _max_y)) in group_bounds.iter().enumerate() {
+            let width = max_x - min_x;
+            let dx = x_offset - min_x;
+            
+            // Move all nodes in this group
+            for &child_idx in &igr.groups[group_idx].children {
+                igr.graph[child_idx].x += dx;
+            }
+            
+            x_offset += width + group_padding;
+        }
+    }
+
+    fn calculate_group_bounds(&self, igr: &mut IntermediateGraph) {
+        for group in &mut igr.groups {
+            if group.children.is_empty() {
+                continue;
+            }
+
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
+
+            for &child_idx in &group.children {
+                let node = &igr.graph[child_idx];
+                let node_min_x = node.x - node.width / 2.0;
+                let node_max_x = node.x + node.width / 2.0;
+                let node_min_y = node.y - node.height / 2.0;
+                let node_max_y = node.y + node.height / 2.0;
+
+                min_x = min_x.min(node_min_x);
+                max_x = max_x.max(node_max_x);
+                min_y = min_y.min(node_min_y);
+                max_y = max_y.max(node_max_y);
+            }
+
+            // Add padding based on group type
+            let padding = match &group.group_type {
+                GroupType::FlowGroup => 30.0,
+                GroupType::BasicGroup => 25.0,
+                GroupType::SemanticGroup(_) => 35.0,
+            };
+            
+            group.bounds = Some(BoundingBox {
+                x: min_x - padding,
+                y: min_y - padding,
+                width: (max_x - min_x) + 2.0 * padding,
+                height: (max_y - min_y) + 2.0 * padding,
+            });
+        }
+    }
+
     // Improved ranking algorithm based on layout-rust's longest path
     fn assign_ranks(&self, igr: &IntermediateGraph) -> Result<HashMap<NodeIndex, i32>> {
         use petgraph::algo::toposort;
@@ -837,6 +1059,7 @@ mod tests {
                 attributes: HashMap::new(),
             }],
             containers: vec![],
+            groups: vec![],
         };
 
         let mut igr = IntermediateGraph::from_ast(document).unwrap();

@@ -1,7 +1,7 @@
 // src/generator.rs
-use crate::ast::{ArrowType, ArrowheadType, FillStyle, StrokeStyle};
+use crate::ast::{ArrowType, ArrowheadType, FillStyle, StrokeStyle, GroupType};
 use crate::error::{GeneratorError, Result};
-use crate::igr::{ContainerData, EdgeData, IntermediateGraph, NodeData};
+use crate::igr::{ContainerData, EdgeData, IntermediateGraph, NodeData, GroupData};
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -125,7 +125,45 @@ impl ExcalidrawGenerator {
         let mut node_id_map = std::collections::HashMap::new();
         let mut node_element_indices = std::collections::HashMap::new();
 
-        // Generate container elements first (background rectangles)
+        // Generate group elements first (visual grouping rectangles)
+        for group in &igr.groups {
+            if let Some(mut group_element) = Self::generate_group(group)? {
+                let group_id = group_element.id.clone();
+                
+                // Generate text element for group if it has a label
+                if let Some(label) = &group.label {
+                    if !label.is_empty() {
+                        if let Some(bounds) = &group.bounds {
+                            let text_element = Self::generate_text_element(
+                                label,
+                                bounds.x + bounds.width / 2.0,
+                                bounds.y + 20.0, // Place text near top of group
+                                &group_id,
+                                group.attributes.font_size.unwrap_or(16.0),
+                                &group.attributes.font,
+                            )?;
+                            
+                            // Add reference to text element in the group's boundElements
+                            group_element.bound_elements.push(serde_json::json!({
+                                "id": text_element.id.clone(),
+                                "type": "text"
+                            }));
+                            
+                            elements.push(group_element);
+                            elements.push(text_element);
+                        } else {
+                            elements.push(group_element);
+                        }
+                    } else {
+                        elements.push(group_element);
+                    }
+                } else {
+                    elements.push(group_element);
+                }
+            }
+        }
+
+        // Generate container elements next (background rectangles)
         for container in &igr.containers {
             if let Some(mut container_element) = Self::generate_container(container)? {
                 let container_id = container_element.id.clone();
@@ -321,7 +359,13 @@ impl ExcalidrawGenerator {
             group_ids: vec![],
             frame_id: None,
             roundness: if shape_type == "rectangle" {
-                Some(serde_json::json!({"type": 3}))
+                if let Some(rounded) = node_data.attributes.rounded {
+                    // Convert rounded value to Excalidraw format
+                    // Excalidraw uses a radius value for rounded corners
+                    Some(serde_json::json!({"type": 3, "value": rounded}))
+                } else {
+                    Some(serde_json::json!({"type": 3}))
+                }
             } else if shape_type == "ellipse" {
                 Some(serde_json::json!({"type": 2}))
             } else {
@@ -435,6 +479,89 @@ impl ExcalidrawGenerator {
             text_align: None,
             vertical_align: None,
         })
+    }
+
+    fn generate_group(group: &GroupData) -> Result<Option<ExcalidrawElementSkeleton>> {
+        let bounds = match &group.bounds {
+            Some(bounds) => bounds,
+            None => return Ok(None), // Group without bounds
+        };
+
+        // Different visual styles for different group types
+        let (stroke_color, background_color, stroke_style, stroke_width) = match &group.group_type {
+            GroupType::FlowGroup => (
+                group.attributes.stroke_color.clone().unwrap_or_else(|| "#3b82f6".to_string()),
+                group.attributes.background_color.clone().unwrap_or_else(|| "#dbeafe".to_string()),
+                group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Dashed),
+                group.attributes.stroke_width.unwrap_or(2.0),
+            ),
+            GroupType::BasicGroup => (
+                group.attributes.stroke_color.clone().unwrap_or_else(|| "#6b7280".to_string()),
+                group.attributes.background_color.clone().unwrap_or_else(|| "#f3f4f6".to_string()),
+                group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Solid),
+                group.attributes.stroke_width.unwrap_or(1.0),
+            ),
+            GroupType::SemanticGroup(group_type) => {
+                // Different colors for different semantic types
+                let (default_stroke, default_bg) = match group_type.as_str() {
+                    "service" => ("#8b5cf6", "#f3e8ff"),
+                    "layer" => ("#f59e0b", "#fef3c7"),
+                    "component" => ("#10b981", "#d1fae5"),
+                    "subsystem" => ("#ef4444", "#fee2e2"),
+                    "zone" => ("#06b6d4", "#cffafe"),
+                    "cluster" => ("#ec4899", "#fce7f3"),
+                    _ => ("#6b7280", "#f3f4f6"),
+                };
+                (
+                    group.attributes.stroke_color.clone().unwrap_or_else(|| default_stroke.to_string()),
+                    group.attributes.background_color.clone().unwrap_or_else(|| default_bg.to_string()),
+                    group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Solid),
+                    group.attributes.stroke_width.unwrap_or(2.0),
+                )
+            }
+        };
+
+        Ok(Some(ExcalidrawElementSkeleton {
+            r#type: "rectangle".to_string(),
+            id: format!("group_{}", Uuid::new_v4()),
+            x: bounds.x.round() as i32,
+            y: bounds.y.round() as i32,
+            width: bounds.width.round() as i32,
+            height: bounds.height.round() as i32,
+            angle: 0,
+            stroke_color,
+            background_color,
+            fill_style: Self::convert_fill_style(&group.attributes.fill_style),
+            stroke_width: stroke_width.round() as i32,
+            stroke_style: Self::convert_stroke_style(&Some(stroke_style)),
+            roughness: group.attributes.roughness.unwrap_or(0),
+            opacity: 30, // Semi-transparent background for groups
+            text: None, // Text will be a separate element
+            font_size: group.attributes.font_size.unwrap_or(18.0).round() as i32,
+            font_family: Self::convert_font_family(&group.attributes.font),
+            start_binding: None,
+            end_binding: None,
+            start_arrowhead: None,
+            end_arrowhead: None,
+            points: None,
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: Some(serde_json::json!({"type": 3})),
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: None,
+            text_align: None,
+            vertical_align: None,
+        }))
     }
 
     fn generate_container(container: &ContainerData) -> Result<Option<ExcalidrawElementSkeleton>> {
@@ -719,9 +846,17 @@ mod tests {
                 attributes: HashMap::new(),
             }],
             containers: vec![],
+            groups: vec![],
         };
 
-        let igr = IntermediateGraph::from_ast(document).unwrap();
+        let mut igr = IntermediateGraph::from_ast(document).unwrap();
+        
+        // Simulate layout being done
+        igr.graph.node_weights_mut().for_each(|node| {
+            node.x = 100.0;
+            node.y = 100.0;
+        });
+        
         let elements = ExcalidrawGenerator::generate(&igr).unwrap();
 
         // Should have 2 nodes + 2 text elements + 1 edge = 5 elements

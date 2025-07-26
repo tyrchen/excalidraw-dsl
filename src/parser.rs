@@ -4,6 +4,7 @@ use crate::error::{ParseError, Result};
 use pest::Parser;
 use pest_derive::Parser;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // Security limits to prevent DoS attacks
 const MAX_INPUT_SIZE: usize = 1_000_000; // 1MB
@@ -30,9 +31,11 @@ pub fn parse_edsl(input: &str) -> Result<ParsedDocument> {
 
 fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument> {
     let mut config = GlobalConfig::default();
+    let mut component_types = HashMap::new();
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     let mut containers = Vec::new();
+    let mut groups = Vec::new();
 
     for pair in pairs {
         match pair.as_rule() {
@@ -43,11 +46,26 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
                             config = parse_config(inner_pair)?;
                         }
                         Rule::statement => {
-                            let statement = parse_statement(inner_pair)?;
-                            match statement {
-                                Statement::Node(node) => nodes.push(node),
-                                Statement::Edge(edge) => edges.push(edge),
-                                Statement::Container(container) => containers.push(container),
+                            for stmt_pair in inner_pair.into_inner() {
+                                match stmt_pair.as_rule() {
+                                    Rule::component_type_def => {
+                                        let comp_type = parse_component_type(stmt_pair)?;
+                                        component_types.insert(comp_type.name.clone(), comp_type);
+                                    }
+                                    Rule::node_def => {
+                                        nodes.push(parse_node_definition(stmt_pair)?);
+                                    }
+                                    Rule::edge_def => {
+                                        edges.push(parse_edge_definition(stmt_pair)?);
+                                    }
+                                    Rule::container_def => {
+                                        containers.push(parse_container_definition(stmt_pair)?);
+                                    }
+                                    Rule::group_def => {
+                                        groups.push(parse_group_definition(stmt_pair)?);
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                         Rule::EOI => break,
@@ -80,9 +98,11 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
 
     Ok(ParsedDocument {
         config,
+        component_types,
         nodes,
         edges,
         containers,
+        groups,
     })
 }
 
@@ -120,6 +140,7 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
         Rule::node_def => Ok(Statement::Node(parse_node_definition(inner)?)),
         Rule::edge_def => Ok(Statement::Edge(parse_edge_definition(inner)?)),
         Rule::container_def => Ok(Statement::Container(parse_container_definition(inner)?)),
+        Rule::group_def => Ok(Statement::Group(parse_group_definition(inner)?)),
         _ => Err(ParseError::Syntax {
             line: 0,
             message: format!("Unexpected rule in statement: {:?}", inner.as_rule()),
@@ -127,9 +148,82 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
     }
 }
 
+fn parse_component_type(pair: pest::iterators::Pair<Rule>) -> Result<ComponentTypeDefinition> {
+    let mut name = String::new();
+    let mut shape = None;
+    let mut style = StyleDefinition {
+        fill: None,
+        stroke_color: None,
+        stroke_width: None,
+        stroke_style: None,
+        rounded: None,
+        fill_style: None,
+        roughness: None,
+        font_size: None,
+        font: None,
+    };
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::id => {
+                name = inner_pair.as_str().to_string();
+            }
+            Rule::component_type_style => {
+                for style_pair in inner_pair.into_inner() {
+                    match style_pair.as_rule() {
+                        Rule::shape_type => {
+                            shape = Some(style_pair.as_str().to_string());
+                        }
+                        Rule::style_block => {
+                            let attrs = parse_style_block(style_pair)?;
+                            // Convert attributes to style fields
+                            if let Some(AttributeValue::String(s)) = attrs.get("fill") {
+                                style.fill = Some(s.clone());
+                            }
+                            if let Some(AttributeValue::String(s)) = attrs.get("strokeColor") {
+                                style.stroke_color = Some(s.clone());
+                            }
+                            if let Some(AttributeValue::Number(n)) = attrs.get("strokeWidth") {
+                                style.stroke_width = Some(*n);
+                            }
+                            if let Some(AttributeValue::String(s)) = attrs.get("strokeStyle") {
+                                style.stroke_style = StrokeStyle::from_str(s);
+                            }
+                            if let Some(AttributeValue::Number(n)) = attrs.get("rounded") {
+                                style.rounded = Some(*n);
+                            }
+                            if let Some(AttributeValue::String(s)) = attrs.get("fillStyle") {
+                                style.fill_style = FillStyle::from_str(s);
+                            }
+                            if let Some(AttributeValue::Number(n)) = attrs.get("roughness") {
+                                style.roughness = Some(*n as u8);
+                            }
+                            if let Some(AttributeValue::Number(n)) = attrs.get("fontSize") {
+                                style.font_size = Some(*n);
+                            }
+                            if let Some(AttributeValue::String(s)) = attrs.get("font") {
+                                style.font = Some(s.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ComponentTypeDefinition {
+        name,
+        shape,
+        style,
+    })
+}
+
 fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefinition> {
     let mut id = String::new();
     let mut label = None;
+    let mut component_type = None;
     let mut attributes = HashMap::new();
 
     for inner_pair in pair.into_inner() {
@@ -145,6 +239,13 @@ fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefini
                     .unwrap_or_else(|| id.clone());
                 label = Some(label_text);
             }
+            Rule::type_ref => {
+                for type_pair in inner_pair.into_inner() {
+                    if type_pair.as_rule() == Rule::id {
+                        component_type = Some(type_pair.as_str().to_string());
+                    }
+                }
+            }
             Rule::style_block => {
                 attributes = parse_style_block(inner_pair)?;
             }
@@ -155,6 +256,7 @@ fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefini
     Ok(NodeDefinition {
         id,
         label,
+        component_type,
         attributes,
     })
 }
@@ -305,6 +407,97 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
             message: "Edge chain requires at least two nodes".to_string(),
         }
         .into())
+    }
+}
+
+fn parse_group_definition(pair: pest::iterators::Pair<Rule>) -> Result<GroupDefinition> {
+    let mut id = None;
+    let mut label = None;
+    let mut group_type = GroupType::BasicGroup;
+    let mut attributes = HashMap::new();
+    let mut internal_statements = Vec::new();
+    let mut children = Vec::new();
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::group_type => {
+                group_type = parse_group_type(inner_pair)?;
+            }
+            Rule::string_literal => {
+                if label.is_none() {
+                    label = Some(parse_string_literal(inner_pair.as_str())?);
+                }
+            }
+            Rule::id => {
+                id = Some(inner_pair.as_str().to_string());
+            }
+            Rule::group_style => {
+                let style_block = inner_pair
+                    .into_inner()
+                    .find(|p| p.as_rule() == Rule::style_block)
+                    .ok_or_else(|| ParseError::Syntax {
+                        line: 0,
+                        message: "Expected style block in group style".to_string(),
+                    })?;
+                attributes = parse_style_block(style_block)?;
+            }
+            Rule::statement => {
+                let statement = parse_statement(inner_pair)?;
+
+                // Collect child node IDs
+                match &statement {
+                    Statement::Node(node) => {
+                        children.push(node.id.clone());
+                    }
+                    Statement::Edge(edge) => {
+                        // Ensure both nodes are tracked as children
+                        if !children.contains(&edge.from) {
+                            children.push(edge.from.clone());
+                        }
+                        if !children.contains(&edge.to) {
+                            children.push(edge.to.clone());
+                        }
+                    }
+                    _ => {}
+                }
+
+                internal_statements.push(statement);
+            }
+            _ => {}
+        }
+    }
+
+    // Generate ID from label if not provided
+    let final_id = id.unwrap_or_else(|| {
+        label.as_ref()
+            .map(|l| l.to_lowercase().replace(' ', "_"))
+            .unwrap_or_else(|| format!("group_{}", Uuid::new_v4().to_string()))
+    });
+
+    Ok(GroupDefinition {
+        id: final_id,
+        label,
+        group_type,
+        children,
+        attributes,
+        internal_statements,
+    })
+}
+
+fn parse_group_type(pair: pest::iterators::Pair<Rule>) -> Result<GroupType> {
+    let type_str = pair.as_str();
+    match type_str {
+        "group" => Ok(GroupType::BasicGroup),
+        "flow" => Ok(GroupType::FlowGroup),
+        _ => {
+            // Check if it's a semantic group type
+            for inner_pair in pair.into_inner() {
+                if inner_pair.as_rule() == Rule::semantic_group_type {
+                    return Ok(GroupType::SemanticGroup(inner_pair.as_str().to_string()));
+                }
+            }
+            Ok(GroupType::SemanticGroup(type_str.to_string()))
+        }
     }
 }
 

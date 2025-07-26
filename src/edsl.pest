@@ -9,10 +9,23 @@ config = { "---" ~ yaml_content ~ "---" }
 yaml_content = { (!"---" ~ ANY)* }
 
 // Main statements
-statement = { (container_def | edge_def | node_def) ~ ";"? }
+statement = { (component_type_def | container_def | group_def | edge_def | node_def) ~ ";"? }
+
+// Component type definitions
+component_type_def = {
+  "componentType" ~ id ~ "{" ~ 
+  component_type_style ~ 
+  "}"
+}
+component_type_style = {
+  ("shape" ~ ":" ~ shape_type ~ ";")? ~
+  ("style" ~ style_block)?
+}
+shape_type = { "rectangle" | "ellipse" | "diamond" | "cylinder" }
 
 // Node definitions
-node_def = { id ~ label? ~ style_block? }
+node_def = { id ~ label? ~ type_ref? ~ style_block? }
+type_ref = { "{" ~ "type" ~ ":" ~ id ~ "}" }
 label = { "[" ~ label_text ~ "]" }
 label_text = @{ (!"[" ~ !"]" ~ !"\"" ~ !NEWLINE ~ ANY)+ }
 
@@ -33,6 +46,17 @@ container_def = {
   "}" 
 }
 container_style = { "style:" ~ style_block }
+
+// Group definitions
+group_def = { 
+  group_type ~ string_literal ~ ("as" ~ id)? ~ "{" ~ 
+  group_style? ~ 
+  statement* ~ 
+  "}" 
+}
+group_type = { "group" | "flow" | semantic_group_type }
+semantic_group_type = { "service" | "layer" | "component" | "subsystem" | "zone" | "cluster" }
+group_style = { "style:" ~ style_block }
 
 // Style blocks
 style_block = { "{" ~ attribute* ~ "}" }

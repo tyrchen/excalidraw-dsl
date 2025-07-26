@@ -1,0 +1,68 @@
+---
+title: Component Types Demo
+layout: dagre
+---
+
+# Define reusable component types
+componentType service {
+  shape: rectangle;
+  style {
+    fill: "#e8f5e9";
+    strokeColor: "#4caf50";
+    strokeWidth: 2;
+    rounded: 8;
+  }
+}
+
+componentType security {
+  shape: rectangle;
+  style {
+    fill: "#ffebee";
+    strokeColor: "#f44336";
+    strokeWidth: 2;
+    rounded: 8;
+  }
+}
+
+componentType database {
+  shape: cylinder;
+  style {
+    fill: "#e3f2fd";
+    strokeColor: "#2196f3";
+    strokeWidth: 2;
+  }
+}
+
+componentType control {
+  shape: diamond;
+  style {
+    fill: "#fff3e0";
+    strokeColor: "#ff9800";
+    strokeWidth: 2;
+  }
+}
+
+# System Architecture using Component Types
+UserService [User Service] { type: service }
+AuthService [Auth Service] { type: security }
+ApiGateway [API Gateway] { type: control }
+OrderService [Order Service] { type: service }
+PaymentService [Payment Service] { type: service }
+UserDB [User Database] { type: database }
+OrderDB [Order Database] { type: database }
+
+# Connections
+ApiGateway -> UserService : "User requests"
+ApiGateway -> OrderService : "Order requests"
+ApiGateway -> AuthService : "Verify tokens"
+UserService -> UserDB : "User data"
+OrderService -> OrderDB : "Order data"
+OrderService -> PaymentService : "Process payment"
+AuthService -> UserDB : "Auth queries"
+
+# Override component type styling for specific node
+AdminService [Admin Service] { type: service } {
+  backgroundColor: "#fce4ec";  # Custom override
+}
+
+ApiGateway -> AdminService : "Admin requests"

@@ -15,15 +15,38 @@ pub struct GlobalConfig {
 #[derive(Debug, Clone)]
 pub struct ParsedDocument {
     pub config: GlobalConfig,
+    pub component_types: HashMap<String, ComponentTypeDefinition>,
     pub nodes: Vec<NodeDefinition>,
     pub edges: Vec<EdgeDefinition>,
     pub containers: Vec<ContainerDefinition>,
+    pub groups: Vec<GroupDefinition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ComponentTypeDefinition {
+    pub name: String,
+    pub shape: Option<String>,
+    pub style: StyleDefinition,
+}
+
+#[derive(Debug, Clone)]
+pub struct StyleDefinition {
+    pub fill: Option<String>,
+    pub stroke_color: Option<String>,
+    pub stroke_width: Option<f64>,
+    pub stroke_style: Option<StrokeStyle>,
+    pub rounded: Option<f64>,
+    pub fill_style: Option<FillStyle>,
+    pub roughness: Option<u8>,
+    pub font_size: Option<f64>,
+    pub font: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct NodeDefinition {
     pub id: String,
     pub label: Option<String>,
+    pub component_type: Option<String>,
     pub attributes: HashMap<String, AttributeValue>,
 }
 
@@ -46,10 +69,28 @@ pub struct ContainerDefinition {
 }
 
 #[derive(Debug, Clone)]
+pub struct GroupDefinition {
+    pub id: String,
+    pub label: Option<String>,
+    pub group_type: GroupType,
+    pub children: Vec<String>, // Node IDs
+    pub attributes: HashMap<String, AttributeValue>,
+    pub internal_statements: Vec<Statement>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupType {
+    BasicGroup,      // group "name" { ... }
+    FlowGroup,       // flow "name" { ... }
+    SemanticGroup(String), // service "name" { ... }, layer "name" { ... }, etc.
+}
+
+#[derive(Debug, Clone)]
 pub enum Statement {
     Node(NodeDefinition),
     Edge(EdgeDefinition),
     Container(ContainerDefinition),
+    Group(GroupDefinition),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -63,6 +63,9 @@ pub enum BuildError {
 
     #[error("Empty container: {0}")]
     EmptyContainer(String),
+
+    #[error("Unknown component type: {0}")]
+    UnknownComponentType(String),
 }
 
 #[derive(Error, Debug)]
