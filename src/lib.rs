@@ -198,12 +198,7 @@ impl Default for EDSLCompiler {
     }
 }
 
-// Additional test modules
-// TODO: Fix generator_test module to test public API only
-// #[cfg(test)]
-// mod generator_test;
-#[cfg(test)]
-mod integration_tests;
+// Additional integration tests are located in tests/ directory
 
 #[cfg(test)]
 mod tests {
