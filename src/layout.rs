@@ -3,6 +3,7 @@ use crate::error::{LayoutError, Result};
 use crate::igr::{BoundingBox, IntermediateGraph};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
+use petgraph::Direction as PetDirection;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -165,7 +166,9 @@ pub struct DagreLayout {
 pub struct DagreLayoutOptions {
     pub node_sep: f64,
     pub rank_sep: f64,
+    pub edge_sep: f64,
     pub direction: Direction,
+    pub ranker: RankingAlgorithm,
 }
 
 #[derive(Debug, Clone)]
@@ -176,12 +179,21 @@ pub enum Direction {
     RightLeft,
 }
 
+#[derive(Debug, Clone)]
+pub enum RankingAlgorithm {
+    LongestPath,
+    TightTree,
+    NetworkSimplex,
+}
+
 impl Default for DagreLayoutOptions {
     fn default() -> Self {
         Self {
             node_sep: 80.0,  // Increased separation between nodes in same layer
             rank_sep: 150.0, // Increased separation between layers
+            edge_sep: 20.0,  // Separation between edges
             direction: Direction::LeftRight, // Changed default to left-right
+            ranker: RankingAlgorithm::LongestPath,
         }
     }
 }
@@ -204,9 +216,11 @@ impl LayoutEngine for DagreLayout {
             return Ok(());
         }
 
-        // Simple layered layout algorithm
-        let layers = self.assign_layers(igr)?;
-        self.position_nodes(igr, &layers)?;
+        // Improved layered layout algorithm based on layout-rust
+        let node_ranks = self.assign_ranks(igr)?;
+        let layers = self.build_layers(igr, &node_ranks);
+        let ordered_layers = self.minimize_crossings(igr, layers);
+        self.position_nodes(igr, &ordered_layers)?;
         self.calculate_container_bounds(igr);
 
         Ok(())
@@ -218,13 +232,12 @@ impl LayoutEngine for DagreLayout {
 }
 
 impl DagreLayout {
-    fn assign_layers(&self, igr: &IntermediateGraph) -> Result<Vec<Vec<NodeIndex>>> {
+    // Improved ranking algorithm based on layout-rust's longest path
+    fn assign_ranks(&self, igr: &IntermediateGraph) -> Result<HashMap<NodeIndex, i32>> {
         use petgraph::algo::toposort;
-        use petgraph::Direction as PetDirection;
-
-        // Perform topological sort to get a rough ordering
-        let topo_order = toposort(&igr.graph, None).map_err(|cycle| {
-            // Extract the node involved in the cycle
+        
+        // First check for cycles
+        let _ = toposort(&igr.graph, None).map_err(|cycle| {
             let node_in_cycle = &igr.graph[cycle.node_id()];
             LayoutError::CalculationFailed(format!(
                 "The 'dagre' layout requires a directed acyclic graph (DAG) but found a cycle involving node '{}'. \
@@ -233,143 +246,288 @@ impl DagreLayout {
             ))
         })?;
 
-        let mut layers: Vec<Vec<NodeIndex>> = Vec::new();
-        let mut node_to_layer: HashMap<NodeIndex, usize> = HashMap::new();
+        match self.options.ranker {
+            RankingAlgorithm::LongestPath => self.longest_path_ranking(igr),
+            RankingAlgorithm::TightTree => {
+                // For now, fall back to longest path
+                self.longest_path_ranking(igr)
+            }
+            RankingAlgorithm::NetworkSimplex => {
+                // For now, fall back to longest path
+                self.longest_path_ranking(igr)
+            }
+        }
+    }
 
-        // Assign nodes to layers based on their dependencies
-        for node_idx in topo_order {
-            let mut max_predecessor_layer = 0;
+    // Longest path ranking algorithm from layout-rust
+    fn longest_path_ranking(&self, igr: &IntermediateGraph) -> Result<HashMap<NodeIndex, i32>> {
+        let mut ranks = HashMap::new();
+        let mut visited = HashMap::new();
 
-            // Find the maximum layer of all predecessors
-            for edge in igr.graph.edges_directed(node_idx, PetDirection::Incoming) {
-                let predecessor = edge.source();
-                if let Some(&pred_layer) = node_to_layer.get(&predecessor) {
-                    max_predecessor_layer = max_predecessor_layer.max(pred_layer + 1);
+        // Find all source nodes (nodes with no incoming edges)
+        let sources: Vec<NodeIndex> = igr.graph.node_indices()
+            .filter(|&node| {
+                igr.graph.edges_directed(node, PetDirection::Incoming).count() == 0
+            })
+            .collect();
+
+        // If no sources found (shouldn't happen after cycle check), use all nodes
+        let starting_nodes = if sources.is_empty() {
+            igr.graph.node_indices().collect()
+        } else {
+            sources
+        };
+
+        // DFS to calculate ranks
+        for node in starting_nodes {
+            self.dfs_rank(igr, node, &mut ranks, &mut visited);
+        }
+
+        Ok(ranks)
+    }
+
+    fn dfs_rank(
+        &self,
+        igr: &IntermediateGraph,
+        node: NodeIndex,
+        ranks: &mut HashMap<NodeIndex, i32>,
+        visited: &mut HashMap<NodeIndex, bool>,
+    ) -> i32 {
+        if visited.contains_key(&node) {
+            return ranks.get(&node).copied().unwrap_or(0);
+        }
+        
+        visited.insert(node, true);
+
+        // Get ranks of all successors
+        let successor_ranks: Vec<i32> = igr.graph
+            .edges_directed(node, PetDirection::Outgoing)
+            .map(|edge| {
+                let target = edge.target();
+                // Edge weight (min length) is 1 by default
+                let edge_weight = 1;
+                self.dfs_rank(igr, target, ranks, visited) - edge_weight
+            })
+            .collect();
+
+        // The rank is the minimum of successor ranks
+        let rank = successor_ranks.into_iter().min().unwrap_or(0);
+        ranks.insert(node, rank);
+        
+        rank
+    }
+
+    // Build layers from ranks
+    fn build_layers(&self, _igr: &IntermediateGraph, node_ranks: &HashMap<NodeIndex, i32>) -> Vec<Vec<NodeIndex>> {
+        let mut layers_map: HashMap<i32, Vec<NodeIndex>> = HashMap::new();
+
+        // Group nodes by rank
+        for (node, &rank) in node_ranks.iter() {
+            layers_map.entry(rank).or_insert_with(Vec::new).push(*node);
+        }
+
+        // Convert to sorted vector of layers
+        let mut sorted_ranks: Vec<i32> = layers_map.keys().copied().collect();
+        sorted_ranks.sort();
+
+        sorted_ranks.into_iter()
+            .map(|rank| layers_map.remove(&rank).unwrap())
+            .collect()
+    }
+
+    // Crossing minimization using barycenter method inspired by layout-rust
+    fn minimize_crossings(&self, igr: &IntermediateGraph, mut layers: Vec<Vec<NodeIndex>>) -> Vec<Vec<NodeIndex>> {
+        // Multiple passes to improve crossing reduction
+        for _ in 0..4 {
+            // Forward pass (top to bottom)
+            for i in 1..layers.len() {
+                let (prev_part, curr_part) = layers.split_at_mut(i);
+                let prev_layer = &prev_part[i - 1];
+                let current_layer = &mut curr_part[0];
+                self.sort_layer_by_barycenter(igr, current_layer, prev_layer, true);
+            }
+            
+            // Backward pass (bottom to top)
+            for i in (0..layers.len() - 1).rev() {
+                let (curr_part, next_part) = layers.split_at_mut(i + 1);
+                let next_layer = &next_part[0];
+                let current_layer = &mut curr_part[i];
+                self.sort_layer_by_barycenter(igr, current_layer, next_layer, false);
+            }
+        }
+        
+        layers
+    }
+    
+    // Sort nodes in a layer based on barycenter of connected nodes
+    fn sort_layer_by_barycenter(
+        &self,
+        igr: &IntermediateGraph,
+        layer: &mut Vec<NodeIndex>,
+        reference_layer: &[NodeIndex],
+        forward: bool,
+    ) {
+        // Create position map for reference layer
+        let positions: HashMap<NodeIndex, usize> = reference_layer
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+        
+        // Calculate barycenter for each node
+        let barycenters: Vec<(NodeIndex, Option<f64>)> = layer
+            .iter()
+            .map(|&node| {
+                let edges = if forward {
+                    // Look at incoming edges from previous layer
+                    igr.graph.edges_directed(node, PetDirection::Incoming)
+                } else {
+                    // Look at outgoing edges to next layer
+                    igr.graph.edges_directed(node, PetDirection::Outgoing)
+                };
+                
+                let mut sum = 0.0;
+                let mut count = 0;
+                
+                for edge in edges {
+                    let other_node = if forward { edge.source() } else { edge.target() };
+                    if let Some(&pos) = positions.get(&other_node) {
+                        sum += pos as f64;
+                        count += 1;
+                    }
                 }
+                
+                let barycenter = if count > 0 {
+                    Some(sum / count as f64)
+                } else {
+                    None
+                };
+                
+                (node, barycenter)
+            })
+            .collect();
+        
+        // Sort by barycenter (nodes without connections stay in place)
+        let mut sorted_indices: Vec<usize> = (0..layer.len()).collect();
+        sorted_indices.sort_by(|&a, &b| {
+            match (barycenters[a].1, barycenters[b].1) {
+                (Some(bc_a), Some(bc_b)) => bc_a.partial_cmp(&bc_b).unwrap(),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => a.cmp(&b),
             }
-
-            // Ensure we have enough layers
-            while layers.len() <= max_predecessor_layer {
-                layers.push(Vec::new());
-            }
-
-            layers[max_predecessor_layer].push(node_idx);
-            node_to_layer.insert(node_idx, max_predecessor_layer);
+        });
+        
+        // Apply the new ordering
+        let original_layer = layer.clone();
+        for (i, &idx) in sorted_indices.iter().enumerate() {
+            layer[i] = original_layer[idx];
         }
-
-        // If no edges (isolated nodes), put all nodes in layer 0
-        if layers.is_empty() && !igr.graph.node_indices().collect::<Vec<_>>().is_empty() {
-            layers.push(igr.graph.node_indices().collect());
-        }
-
-        Ok(layers)
     }
 
     fn position_nodes(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
-        match self.options.direction {
-            Direction::LeftRight | Direction::RightLeft => {
-                self.position_nodes_horizontal(igr, layers)
-            }
-            Direction::TopBottom | Direction::BottomTop => {
-                self.position_nodes_vertical(igr, layers)
-            }
-        }
+        // First assign Y positions (or X for horizontal layouts) based on layers
+        self.assign_layer_positions(igr, layers);
+        
+        // Then assign X positions (or Y for horizontal) within each layer
+        self.assign_node_positions_within_layers(igr, layers);
+        
+        Ok(())
     }
 
-    fn position_nodes_horizontal(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
-        let mut current_x = 0.0;
+    // Assign positions to layers (Y for TB/BT, X for LR/RL)
+    fn assign_layer_positions(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) {
+        let mut layer_positions = Vec::new();
+        let mut current_pos = 0.0;
 
+        // Calculate position for each layer
         for layer in layers {
             if layer.is_empty() {
                 continue;
             }
 
-            // Calculate total height needed for this layer
-            let total_height: f64 = layer.iter().map(|&idx| igr.graph[idx].height).sum();
-            let total_spacing = (layer.len().saturating_sub(1)) as f64 * self.options.node_sep;
-            let layer_height = total_height + total_spacing;
-
-            // Start positioning from the center
-            let start_y = -layer_height / 2.0;
-            let mut current_y = start_y;
-
-            // Find the maximum width in this layer
-            let max_width = layer
-                .iter()
-                .map(|&idx| igr.graph[idx].width)
-                .fold(0.0, f64::max);
-
-            // Position nodes in this layer
-            for &node_idx in layer {
-                let node = &mut igr.graph[node_idx];
-
-                match self.options.direction {
-                    Direction::LeftRight => {
-                        node.x = current_x + max_width / 2.0;
-                        node.y = current_y + node.height / 2.0;
-                    }
-                    Direction::RightLeft => {
-                        node.x = -(current_x + max_width / 2.0);
-                        node.y = current_y + node.height / 2.0;
-                    }
-                    _ => unreachable!(),
+            // Find maximum dimension in this layer
+            let max_dimension = match self.options.direction {
+                Direction::LeftRight | Direction::RightLeft => {
+                    layer.iter()
+                        .map(|&idx| igr.graph[idx].width)
+                        .fold(0.0, f64::max)
                 }
+                Direction::TopBottom | Direction::BottomTop => {
+                    layer.iter()
+                        .map(|&idx| igr.graph[idx].height)
+                        .fold(0.0, f64::max)
+                }
+            };
 
-                current_y += node.height + self.options.node_sep;
-            }
-
-            current_x += max_width + self.options.rank_sep;
+            layer_positions.push(current_pos + max_dimension / 2.0);
+            current_pos += max_dimension + self.options.rank_sep;
         }
 
-        Ok(())
+        // Apply positions to nodes
+        for (layer_idx, layer) in layers.iter().enumerate() {
+            if layer_idx >= layer_positions.len() {
+                continue;
+            }
+            
+            let pos = layer_positions[layer_idx];
+            
+            for &node_idx in layer {
+                let node = &mut igr.graph[node_idx];
+                match self.options.direction {
+                    Direction::LeftRight => node.x = pos,
+                    Direction::RightLeft => node.x = -pos,
+                    Direction::TopBottom => node.y = pos,
+                    Direction::BottomTop => node.y = -pos,
+                }
+            }
+        }
     }
 
-    fn position_nodes_vertical(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
-        let mut current_y = 0.0;
-
+    // Assign positions within each layer
+    fn assign_node_positions_within_layers(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) {
         for layer in layers {
             if layer.is_empty() {
                 continue;
             }
 
-            // Calculate total width needed for this layer
-            let total_width: f64 = layer.iter().map(|&idx| igr.graph[idx].width).sum();
+            // Calculate total size needed for this layer
+            let (total_size, node_sizes) = match self.options.direction {
+                Direction::LeftRight | Direction::RightLeft => {
+                    let sizes: Vec<f64> = layer.iter().map(|&idx| igr.graph[idx].height).collect();
+                    let total: f64 = sizes.iter().sum();
+                    (total, sizes)
+                }
+                Direction::TopBottom | Direction::BottomTop => {
+                    let sizes: Vec<f64> = layer.iter().map(|&idx| igr.graph[idx].width).collect();
+                    let total: f64 = sizes.iter().sum();
+                    (total, sizes)
+                }
+            };
+
             let total_spacing = (layer.len().saturating_sub(1)) as f64 * self.options.node_sep;
-            let layer_width = total_width + total_spacing;
+            let layer_span = total_size + total_spacing;
 
             // Start positioning from the center
-            let start_x = -layer_width / 2.0;
-            let mut current_x = start_x;
+            let mut current_pos = -layer_span / 2.0;
 
-            // Find the maximum height in this layer
-            let max_height = layer
-                .iter()
-                .map(|&idx| igr.graph[idx].height)
-                .fold(0.0, f64::max);
-
-            // Position nodes in this layer
-            for &node_idx in layer {
+            // Position each node in the layer
+            for (i, &node_idx) in layer.iter().enumerate() {
                 let node = &mut igr.graph[node_idx];
-
+                let size = node_sizes[i];
+                
                 match self.options.direction {
-                    Direction::TopBottom => {
-                        node.x = current_x + node.width / 2.0;
-                        node.y = current_y + max_height / 2.0;
+                    Direction::LeftRight | Direction::RightLeft => {
+                        node.y = current_pos + size / 2.0;
                     }
-                    Direction::BottomTop => {
-                        node.x = current_x + node.width / 2.0;
-                        node.y = -(current_y + max_height / 2.0);
+                    Direction::TopBottom | Direction::BottomTop => {
+                        node.x = current_pos + size / 2.0;
                     }
-                    _ => unreachable!(),
                 }
 
-                current_x += node.width + self.options.node_sep;
+                current_pos += size + self.options.node_sep;
             }
-
-            current_y += max_height + self.options.rank_sep;
         }
-
-        Ok(())
     }
 
     fn calculate_container_bounds(&self, igr: &mut IntermediateGraph) {

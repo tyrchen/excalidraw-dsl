@@ -194,14 +194,14 @@ c <-> d
     assert_eq!(lines.len(), 1); // Line type
 
     // First arrow (a -> b) should have end arrowhead
-    assert!(arrows[0]["end_arrowhead"].is_string());
+    assert!(arrows[0]["endArrowhead"].is_string());
 
     // Line (b -- c) should not have arrowheads
-    assert!(lines[0]["end_arrowhead"].is_null());
+    assert!(lines[0]["endArrowhead"].is_null());
 
     // Second arrow (c <-> d) should have both arrowheads
-    assert!(arrows[1]["end_arrowhead"].is_string());
-    assert!(arrows[1]["start_arrowhead"].is_string());
+    assert!(arrows[1]["endArrowhead"].is_string());
+    assert!(arrows[1]["startArrowhead"].is_string());
 }
 
 #[test]
@@ -426,15 +426,15 @@ a -> b
         .expect("Should find arrow element");
 
     // Check edge has proper bindings
-    assert!(edge["start_binding"].is_object());
-    assert!(edge["end_binding"].is_object());
+    assert!(edge["startBinding"].is_object());
+    assert!(edge["endBinding"].is_object());
 
-    let start_binding = &edge["start_binding"];
+    let start_binding = &edge["startBinding"];
     assert!(start_binding["elementId"].is_string());
     assert!(start_binding["gap"].is_number());
     assert!(start_binding["focus"].is_number());
 
-    let end_binding = &edge["end_binding"];
+    let end_binding = &edge["endBinding"];
     assert!(end_binding["elementId"].is_string());
     assert!(end_binding["gap"].is_number());
     assert!(end_binding["focus"].is_number());

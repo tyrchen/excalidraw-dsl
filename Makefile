@@ -1,3 +1,6 @@
+ALL_EDSL_FILES := $(wildcard examples/*.edsl)
+ALL_EXCALIDRAW_FILES := $(patsubst examples/%.edsl,examples/%.excalidraw,$(ALL_EDSL_FILES))
+
 build:
 	@cargo build --all-features
 
@@ -56,5 +59,10 @@ release:
 
 update-submodule:
 	@git submodule update --init --recursive --remote
+
+$(ALL_EXCALIDRAW_FILES): examples/%.excalidraw: examples/%.edsl
+	@cargo run -- convert $< -o $@
+
+build-examples: $(ALL_EXCALIDRAW_FILES)
 
 .PHONY: build convert validate watch server build-server run-server run-ui run-full examples test test-cli install release update-submodule

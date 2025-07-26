@@ -53,12 +53,16 @@ pub struct ExcalidrawElementSkeleton {
     #[serde(rename = "fontFamily")]
     pub font_family: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "startBinding")]
     pub start_binding: Option<ElementBinding>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "endBinding")]
     pub end_binding: Option<ElementBinding>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "startArrowhead")]
     pub start_arrowhead: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "endArrowhead")]
     pub end_arrowhead: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub points: Option<Vec<[i32; 2]>>,
@@ -168,7 +172,7 @@ impl ExcalidrawGenerator {
             // Remove text from shape element (it will be a separate element)
             let label = element.text.take();
             
-            // Track the index where this node will be inserted
+            // Track the actual index where this node element is pushed
             let node_index = elements.len();
             node_element_indices.insert(element_id.clone(), node_index);
             
@@ -387,22 +391,22 @@ impl ExcalidrawGenerator {
             start_binding: Some(ElementBinding {
                 element_id: source_element_id.to_string(),
                 focus: 0,
-                gap: 0,
+                gap: 1,
             }),
             end_binding: Some(ElementBinding {
                 element_id: target_element_id.to_string(),
                 focus: 0,
-                gap: 0,
+                gap: 1,
             }),
             start_arrowhead: Self::convert_arrowhead(&edge_data.attributes.start_arrowhead)
                 .or_else(|| match edge_data.arrow_type {
-                    ArrowType::DoubleArrow => Some("triangle".to_string()),
+                    ArrowType::DoubleArrow => Some("arrow".to_string()),
                     _ => None,
                 }),
             end_arrowhead: Self::convert_arrowhead(&edge_data.attributes.end_arrowhead).or_else(
                 || match edge_data.arrow_type {
-                    ArrowType::SingleArrow => Some("triangle".to_string()),
-                    ArrowType::DoubleArrow => Some("triangle".to_string()),
+                    ArrowType::SingleArrow => Some("arrow".to_string()),
+                    ArrowType::DoubleArrow => Some("arrow".to_string()),
                     _ => None,
                 },
             ),
@@ -738,6 +742,6 @@ mod tests {
         assert_eq!(edge.text, Some("Edge".to_string()));
         assert!(edge.start_binding.is_some());
         assert!(edge.end_binding.is_some());
-        assert_eq!(edge.end_arrowhead, Some("triangle".to_string()));
+        assert_eq!(edge.end_arrowhead, Some("arrow".to_string()));
     }
 }

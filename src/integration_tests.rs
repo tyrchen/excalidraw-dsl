@@ -143,9 +143,9 @@ a -> b: Test Label
             .unwrap();
         
         assert_eq!(arrow_element["text"], "Test Label");
-        assert!(arrow_element["start_binding"].is_object());
-        assert!(arrow_element["end_binding"].is_object());
-        assert_eq!(arrow_element["end_arrowhead"], "triangle");
+        assert!(arrow_element["startBinding"].is_object());
+        assert!(arrow_element["endBinding"].is_object());
+        assert_eq!(arrow_element["endArrowhead"], "arrow");
     }
 
     #[test]

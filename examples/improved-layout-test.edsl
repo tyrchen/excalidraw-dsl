@@ -1,0 +1,35 @@
+---
+layout: dagre
+---
+
+# Improved Layout Test
+# Testing the enhanced layout engine with longest-path ranking and barycenter crossing minimization
+
+# A more complex graph to test layout improvements
+start[Start Process]
+parse[Parse Input]
+validate[Validate Data]
+analyze[Analyze Content]
+optimize[Optimize Results]
+transform[Transform Data]
+export[Export Output]
+log[Log Results]
+notify[Send Notifications]
+complete[Process Complete]
+
+start -> parse
+start -> validate
+parse -> analyze
+validate -> analyze
+analyze -> optimize
+analyze -> transform
+optimize -> export
+transform -> export
+export -> log
+export -> notify
+log -> complete
+notify -> complete
+
+# Additional cross-layer edges to test crossing minimization
+parse -> optimize: "Direct optimization path"
+validate -> transform: "Bypass analysis"
