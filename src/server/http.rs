@@ -77,6 +77,9 @@ pub fn create_router(state: AppState) -> Router {
     let allowed_origins = [
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:5174",  // Vite dev server
+        "http://localhost:5175",
+        "http://localhost:5176",
         "https://excalidraw.com",
         "https://excalidraw-dsl.com",
     ]
@@ -98,7 +101,12 @@ pub fn create_router(state: AppState) -> Router {
                     CorsLayer::new()
                         .allow_origin(allowed_origins)
                         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-                        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+                        .allow_headers([
+                            header::CONTENT_TYPE, 
+                            header::AUTHORIZATION,
+                            header::UPGRADE,
+                            header::CONNECTION,
+                        ])
                         .expose_headers([header::CONTENT_TYPE])
                         .allow_credentials(true),
                 ),
@@ -138,24 +146,27 @@ async fn compile_handler(
         .join("\n");
     log::debug!("EDSL content preview:\n{}", preview);
 
-    match state.compiler.compile_to_elements(&req.edsl_content) {
-        Ok(elements) => {
-            // Convert elements to JSON Value for frontend compatibility
-            match serde_json::to_value(&elements) {
-                Ok(data) => Json(CompileResponse {
-                    success: true,
-                    data: Some(data),
-                    error: None,
-                })
-                .into_response(),
+    match state.compiler.compile(&req.edsl_content) {
+        Ok(excalidraw_json) => {
+            // Parse the JSON string to a Value for the response
+            match serde_json::from_str::<serde_json::Value>(&excalidraw_json) {
+                Ok(data) => {
+                    log::info!("Compilation successful, returning full Excalidraw file format");
+                    Json(CompileResponse {
+                        success: true,
+                        data: Some(data),
+                        error: None,
+                    })
+                    .into_response()
+                }
                 Err(e) => {
-                    log::error!("JSON serialization failed: {}", e);
+                    log::error!("JSON parsing failed: {}", e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(CompileResponse {
                             success: false,
                             data: None,
-                            error: Some(format!("Serialization error: {}", e)),
+                            error: Some(format!("JSON parsing error: {}", e)),
                         }),
                     )
                         .into_response()
@@ -208,6 +219,7 @@ async fn validate_handler(
 
 /// WebSocket upgrade handler
 async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    log::info!("WebSocket upgrade request received");
     ws.on_upgrade(|socket| super::websocket::handle_websocket(socket, state))
 }
 

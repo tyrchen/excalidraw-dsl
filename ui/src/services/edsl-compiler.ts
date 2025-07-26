@@ -135,6 +135,8 @@ export class EDSLCompilerService {
         this.websocket.onerror = (error) => {
           clearTimeout(connectionTimeout);
           console.warn('WebSocket connection error:', error);
+          console.warn('WebSocket readyState:', this.websocket?.readyState);
+          console.warn('WebSocket URL:', this.websocket?.url);
           reject(new Error('WebSocket connection failed'));
         };
 
@@ -170,6 +172,12 @@ export class EDSLCompilerService {
   private handleWebSocketMessage(message: any): void {
     const { type, id } = message;
     console.log('📥 WebSocket message received:', { type, id, success: message.success });
+    
+    // Handle connection message specially
+    if (type === 'connected') {
+      console.log('🔌 WebSocket connected:', message);
+      return;
+    }
     
     const pending = this.pendingRequests.get(id);
 
@@ -280,8 +288,14 @@ export class EDSLCompilerService {
   disconnectWebSocket(): void {
     if (this.websocket) {
       try {
-        if (this.websocket.readyState === WebSocket.OPEN || this.websocket.readyState === WebSocket.CONNECTING) {
+        // Only close if the WebSocket is already open
+        // Closing during CONNECTING state causes an error
+        if (this.websocket.readyState === WebSocket.OPEN) {
           this.websocket.close();
+        } else if (this.websocket.readyState === WebSocket.CONNECTING) {
+          // If still connecting, just null the reference
+          // The connection will be cleaned up when it completes or fails
+          console.log('WebSocket still connecting, will not force close');
         }
       } catch (error) {
         console.warn('Error closing WebSocket:', error);

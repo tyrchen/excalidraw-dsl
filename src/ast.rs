@@ -20,6 +20,7 @@ pub struct ParsedDocument {
     pub edges: Vec<EdgeDefinition>,
     pub containers: Vec<ContainerDefinition>,
     pub groups: Vec<GroupDefinition>,
+    pub connections: Vec<ConnectionDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +58,25 @@ pub struct EdgeDefinition {
     pub label: Option<String>,
     pub arrow_type: ArrowType,
     pub attributes: HashMap<String, AttributeValue>,
+    pub style: Option<EdgeStyleDefinition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectionDefinition {
+    pub from: String,
+    pub to: Vec<String>,
+    pub style: EdgeStyleDefinition,
+}
+
+#[derive(Debug, Clone)]
+pub struct EdgeStyleDefinition {
+    pub edge_type: Option<EdgeType>,
+    pub label: Option<String>,
+    pub label_position: Option<f64>,
+    pub routing: Option<RoutingType>,
+    pub color: Option<String>,
+    pub width: Option<f64>,
+    pub stroke_style: Option<StrokeStyle>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +111,7 @@ pub enum Statement {
     Edge(EdgeDefinition),
     Container(ContainerDefinition),
     Group(GroupDefinition),
+    Connection(ConnectionDefinition),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,6 +153,29 @@ pub enum ArrowType {
     WavyArrow,   // ~>
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeType {
+    Arrow,
+    Line,
+    Dashed,
+    Dotted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoutingType {
+    Straight,
+    Orthogonal,
+    Curved,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StrokeStyle {
+    Solid,
+    Dashed,
+    Dotted,
+}
+
 impl ArrowType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
@@ -153,12 +197,6 @@ impl ArrowType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StrokeStyle {
-    Solid,
-    Dotted,
-    Dashed,
-}
 
 impl StrokeStyle {
     pub fn from_str(s: &str) -> Option<Self> {

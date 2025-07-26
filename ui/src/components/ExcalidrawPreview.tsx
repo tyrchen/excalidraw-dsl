@@ -10,8 +10,9 @@ interface ExcalidrawPreviewProps {
 }
 
 export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className }) => {
-  const { compilationResult, isCompiling, edslContent } = useEDSLStore();
+  const { compilationResult, isCompiling, editorContent } = useEDSLStore();
   const [elements, setElements] = useState<any[]>([]);
+  const [appState, setAppState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
@@ -23,7 +24,7 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
       // Store debug data
       setDebugData({
         compilationResult,
-        edslContent,
+        edslContent: editorContent,
         timestamp: new Date().toISOString(),
       });
 
@@ -31,65 +32,55 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
         try {
           console.log('Raw compilation data:', compilationResult.data);
           
-          // Handle both array and single object
-          const rawData = Array.isArray(compilationResult.data) 
-            ? compilationResult.data 
-            : [compilationResult.data];
-
-          // Convert our elements to proper Excalidraw elements
-          const excalidrawElements = rawData.map((el: any, index: number) => {
-            const element = {
-              ...el,
-              // Ensure required Excalidraw properties
-              id: el.id || `element_${index}_${Date.now()}`,
-              version: 1,
-              versionNonce: Math.floor(Math.random() * 1000000),
-              isDeleted: false,
-              groupIds: [],
-              frameId: null,
-              index: index,
-              roundness: el.type === 'rectangle' ? { type: 1 } : null,
-              boundElements: [],
-              updated: Date.now(),
-              link: null,
-              locked: false,
-              // Ensure coordinates are numbers
-              x: Number(el.x) || 0,
-              y: Number(el.y) || 0,
-              width: Number(el.width) || 100,
-              height: Number(el.height) || 60,
-              angle: Number(el.angle) || 0,
-              strokeWidth: Number(el.strokeWidth) || 2,
-              opacity: Number(el.opacity) || 100,
-              fontSize: Number(el.fontSize) || 16,
-              fontFamily: Number(el.fontFamily) || 1,
-              roughness: Number(el.roughness) || 1,
-            };
-            
-            console.log(`Element ${index}:`, element);
-            return element;
-          });
+          // Check if this is the full Excalidraw file format
+          let elementsToRender: any[] = [];
           
-          console.log('Processed Excalidraw elements:', excalidrawElements);
-          setElements(excalidrawElements);
+          if (compilationResult.data.type === 'excalidraw' && compilationResult.data.elements) {
+            // New format: full Excalidraw file
+            console.log('Detected full Excalidraw file format');
+            elementsToRender = compilationResult.data.elements;
+            // Also extract appState if available
+            if (compilationResult.data.appState) {
+              setAppState(compilationResult.data.appState);
+            }
+          } else if (Array.isArray(compilationResult.data)) {
+            // Legacy format: array of elements
+            console.log('Detected legacy array format');
+            elementsToRender = compilationResult.data;
+          } else {
+            // Unknown format
+            console.error('Unknown compilation data format:', compilationResult.data);
+            throw new Error('Unknown compilation data format');
+          }
+
+          console.log(`Found ${elementsToRender.length} elements to render`);
+          
+          // The elements from the server should already be in the correct Excalidraw format
+          // Just ensure they're valid
+          const validElements = elementsToRender.filter(el => el && el.type && el.id);
+          
+          console.log('Valid Excalidraw elements:', validElements);
+          setElements(validElements);
           setError(null);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Failed to render diagram';
           console.error('Error processing elements:', err);
           setError(errorMsg);
           setElements([]);
+          setAppState(null);
         }
       } else {
         const errorMsg = compilationResult.error || 'Compilation failed';
         console.warn('Compilation failed:', errorMsg);
         setError(errorMsg);
         setElements([]);
+        setAppState(null);
       }
     } else {
       console.log('No compilation result');
       setDebugData(null);
     }
-  }, [compilationResult]);
+  }, [compilationResult, editorContent]);
 
   if (error) {
     // Parse error messages to provide helpful hints
@@ -225,27 +216,27 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
       )}
 
       {/* Main Preview Area */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" style={{ height: '100%', minHeight: '400px' }}>
         {elements.length > 0 ? (
           <Excalidraw
             initialData={{
               elements,
               appState: {
-                viewBackgroundColor: '#ffffff',
+                viewBackgroundColor: appState?.viewBackgroundColor || '#ffffff',
                 scrollX: 0,
                 scrollY: 0,
                 zoom: { value: 1 },
-                viewModeEnabled: true,
+                ...(appState || {}),
               },
             }}
             UIOptions={{
               canvasActions: {
-                changeViewBackgroundColor: false,
+                changeViewBackgroundColor: true,
                 clearCanvas: false,
-                export: false,
+                export: { saveFileToDisk: true },
                 loadScene: false,
-                saveScene: false,
-                saveAsImage: false,
+                saveToActiveFile: false,
+                saveAsImage: true,
               },
             }}
           />

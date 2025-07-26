@@ -36,6 +36,7 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
     let mut edges = Vec::new();
     let mut containers = Vec::new();
     let mut groups = Vec::new();
+    let mut connections = Vec::new();
 
     for pair in pairs {
         match pair.as_rule() {
@@ -64,7 +65,16 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
                                     Rule::group_def => {
                                         groups.push(parse_group_definition(stmt_pair)?);
                                     }
-                                    _ => {}
+                                    Rule::connection_def => {
+                                        connections.push(parse_connection(stmt_pair)?);
+                                    }
+                                    Rule::connections_def => {
+                                        let conns = parse_connections(stmt_pair)?;
+                                        connections.extend(conns);
+                                    }
+                                    _ => {
+                                        log::warn!("Unknown statement rule: {:?}", stmt_pair.as_rule());
+                                    }
                                 }
                             }
                         }
@@ -103,6 +113,7 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
         edges,
         containers,
         groups,
+        connections,
     })
 }
 
@@ -350,6 +361,7 @@ fn parse_single_edge(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition
         label,
         arrow_type,
         attributes,
+        style: None,
     })
 }
 
@@ -400,6 +412,7 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
             label,
             arrow_type,
             attributes,
+            style: None,
         })
     } else {
         Err(ParseError::Syntax {
@@ -624,6 +637,171 @@ fn parse_string_literal(s: &str) -> Result<String> {
     } else {
         Ok(s.to_string())
     }
+}
+
+fn parse_connection(pair: pest::iterators::Pair<Rule>) -> Result<ConnectionDefinition> {
+    let mut from = String::new();
+    let mut to = String::new();
+    let mut style = EdgeStyleDefinition {
+        edge_type: None,
+        label: None,
+        label_position: None,
+        routing: None,
+        color: None,
+        width: None,
+        stroke_style: None,
+    };
+
+    // Based on the grammar, the pairs come in order: from string, to string, style block
+    let mut inner_pairs = pair.into_inner();
+    
+    // First string literal is "from"
+    if let Some(from_pair) = inner_pairs.next() {
+        if from_pair.as_rule() == Rule::string_literal {
+            from = from_pair.as_str().trim_matches('"').to_string();
+        }
+    }
+    
+    // Second string literal is "to"
+    if let Some(to_pair) = inner_pairs.next() {
+        if to_pair.as_rule() == Rule::string_literal {
+            to = to_pair.as_str().trim_matches('"').to_string();
+        }
+    }
+    
+    // Third is the style block
+    if let Some(style_pair) = inner_pairs.next() {
+        if style_pair.as_rule() == Rule::connection_style {
+            style = parse_connection_style(style_pair)?;
+        }
+    }
+
+    Ok(ConnectionDefinition {
+        from,
+        to: vec![to],
+        style,
+    })
+}
+
+fn parse_connections(pair: pest::iterators::Pair<Rule>) -> Result<Vec<ConnectionDefinition>> {
+    let mut from = String::new();
+    let mut to_list = Vec::new();
+    let mut style = EdgeStyleDefinition {
+        edge_type: None,
+        label: None,
+        label_position: None,
+        routing: None,
+        color: None,
+        width: None,
+        stroke_style: None,
+    };
+
+    // Based on the grammar, the pairs come in order: from string, to array, style block
+    let mut inner_pairs = pair.into_inner();
+    
+    // First string literal is "from"
+    if let Some(from_pair) = inner_pairs.next() {
+        if from_pair.as_rule() == Rule::string_literal {
+            from = from_pair.as_str().trim_matches('"').to_string();
+        }
+    }
+    
+    // Second is the connection_targets array
+    if let Some(targets_pair) = inner_pairs.next() {
+        if targets_pair.as_rule() == Rule::connection_targets {
+            for target_pair in targets_pair.into_inner() {
+                if target_pair.as_rule() == Rule::string_literal {
+                    to_list.push(target_pair.as_str().trim_matches('"').to_string());
+                }
+            }
+        }
+    }
+    
+    // Third is the style block
+    if let Some(style_pair) = inner_pairs.next() {
+        if style_pair.as_rule() == Rule::connection_style {
+            style = parse_connection_style(style_pair)?;
+        }
+    }
+
+    // Create a connection for each target
+    Ok(to_list.into_iter().map(|to| ConnectionDefinition {
+        from: from.clone(),
+        to: vec![to],
+        style: style.clone(),
+    }).collect())
+}
+
+fn parse_connection_style(pair: pest::iterators::Pair<Rule>) -> Result<EdgeStyleDefinition> {
+    let mut style = EdgeStyleDefinition {
+        edge_type: None,
+        label: None,
+        label_position: None,
+        routing: None,
+        color: None,
+        width: None,
+        stroke_style: None,
+    };
+
+    for attr_pair in pair.into_inner() {
+        if attr_pair.as_rule() == Rule::connection_style_attr {
+            for inner in attr_pair.into_inner() {
+                match inner.as_rule() {
+                    Rule::edge_type => {
+                        style.edge_type = Some(match inner.as_str() {
+                            "arrow" => EdgeType::Arrow,
+                            "line" => EdgeType::Line,
+                            "dashed" => EdgeType::Dashed,
+                            "dotted" => EdgeType::Dotted,
+                            _ => EdgeType::Arrow,
+                        });
+                    }
+                    Rule::string_literal => {
+                        let value = parse_string_literal(&inner.as_str())?;
+                        // Determine which field based on context
+                        if style.label.is_none() {
+                            style.label = Some(value);
+                        } else if style.color.is_none() {
+                            style.color = Some(value);
+                        }
+                    }
+                    Rule::number => {
+                        let value: f64 = inner.as_str().parse()
+                            .map_err(|_| ParseError::Syntax {
+                                line: inner.as_span().start_pos().line_col().0,
+                                message: "Invalid number".to_string(),
+                            })?;
+                        // Determine which field based on context
+                        if style.label_position.is_none() {
+                            style.label_position = Some(value);
+                        } else if style.width.is_none() {
+                            style.width = Some(value);
+                        }
+                    }
+                    Rule::routing_type => {
+                        style.routing = Some(match inner.as_str() {
+                            "straight" => RoutingType::Straight,
+                            "orthogonal" => RoutingType::Orthogonal,
+                            "curved" => RoutingType::Curved,
+                            "auto" => RoutingType::Auto,
+                            _ => RoutingType::Auto,
+                        });
+                    }
+                    Rule::stroke_style => {
+                        style.stroke_style = Some(match inner.as_str() {
+                            "solid" => StrokeStyle::Solid,
+                            "dashed" => StrokeStyle::Dashed,
+                            "dotted" => StrokeStyle::Dotted,
+                            _ => StrokeStyle::Solid,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(style)
 }
 
 #[cfg(test)]

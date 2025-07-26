@@ -144,6 +144,9 @@ impl IntermediateGraph {
                         // Nested groups - for now just ignore
                         // TODO: Handle nested groups
                     }
+                    Statement::Connection(_) => {
+                        // Connections are handled separately
+                    }
                 }
             }
         }
@@ -159,6 +162,9 @@ impl IntermediateGraph {
                     }
                     Statement::Group(_) => {
                         // Nested groups - for now just ignore
+                    }
+                    Statement::Connection(_) => {
+                        // Connections are handled separately
                     }
                 }
             }
@@ -194,6 +200,15 @@ impl IntermediateGraph {
         for container_def in document.containers {
             let container_data = ContainerData::from_definition(container_def, &igr.node_map)?;
             igr.containers.push(container_data);
+        }
+
+        // Process connections (convert to edges)
+        for connection in document.connections {
+            // Convert each connection to edges
+            let edges = EdgeData::from_connection(connection, &igr.node_map)?;
+            for (from_idx, to_idx, edge_data) in edges {
+                igr.graph.add_edge(from_idx, to_idx, edge_data);
+            }
         }
 
         // Build groups
@@ -328,13 +343,98 @@ impl NodeData {
 
 impl EdgeData {
     pub fn from_definition(def: EdgeDefinition) -> Result<Self> {
-        let attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
+        let mut attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
+        
+        // Apply advanced edge styling if present
+        if let Some(style) = &def.style {
+            // Map edge type to stroke style
+            if let Some(edge_type) = &style.edge_type {
+                match edge_type {
+                    EdgeType::Dashed => attributes.stroke_style = Some(StrokeStyle::Dashed),
+                    EdgeType::Dotted => attributes.stroke_style = Some(StrokeStyle::Dotted),
+                    _ => attributes.stroke_style = Some(StrokeStyle::Solid),
+                }
+            }
+            
+            // Apply other style properties
+            if let Some(color) = &style.color {
+                attributes.stroke_color = Some(color.clone());
+            }
+            if let Some(width) = &style.width {
+                attributes.stroke_width = Some(*width);
+            }
+            if let Some(stroke_style) = &style.stroke_style {
+                attributes.stroke_style = Some(stroke_style.clone());
+            }
+        }
 
         Ok(EdgeData {
-            label: def.label,
+            label: def.label.or(def.style.as_ref().and_then(|s| s.label.clone())),
             arrow_type: def.arrow_type,
             attributes,
         })
+    }
+    
+    pub fn from_connection(def: ConnectionDefinition, node_map: &HashMap<String, NodeIndex>) -> Result<Vec<(NodeIndex, NodeIndex, EdgeData)>> {
+        let mut edges = Vec::new();
+        
+        // Get the source node index
+        let from_idx = node_map.get(&def.from)
+            .copied()
+            .ok_or_else(|| BuildError::UnknownNode(def.from.clone()))?;
+        
+        // Create an edge for each target
+        for to_id in &def.to {
+            let to_idx = node_map.get(to_id)
+                .copied()
+                .ok_or_else(|| BuildError::UnknownNode(to_id.clone()))?;
+            
+            let mut attributes = ExcalidrawAttributes::default();
+            
+            // Apply connection style
+            let style = &def.style;
+            
+            // Map edge type to arrow type and stroke style
+            let arrow_type = if let Some(edge_type) = &style.edge_type {
+                match edge_type {
+                    EdgeType::Arrow => ArrowType::SingleArrow,
+                    EdgeType::Line => ArrowType::Line,
+                    _ => ArrowType::SingleArrow,
+                }
+            } else {
+                ArrowType::SingleArrow
+            };
+            
+            // Apply stroke style
+            if let Some(edge_type) = &style.edge_type {
+                match edge_type {
+                    EdgeType::Dashed => attributes.stroke_style = Some(StrokeStyle::Dashed),
+                    EdgeType::Dotted => attributes.stroke_style = Some(StrokeStyle::Dotted),
+                    _ => attributes.stroke_style = Some(StrokeStyle::Solid),
+                }
+            }
+            
+            // Apply other style properties
+            if let Some(color) = &style.color {
+                attributes.stroke_color = Some(color.clone());
+            }
+            if let Some(width) = &style.width {
+                attributes.stroke_width = Some(*width);
+            }
+            if let Some(stroke_style) = &style.stroke_style {
+                attributes.stroke_style = Some(stroke_style.clone());
+            }
+            
+            let edge_data = EdgeData {
+                label: style.label.clone(),
+                arrow_type,
+                attributes,
+            };
+            
+            edges.push((from_idx, to_idx, edge_data));
+        }
+        
+        Ok(edges)
     }
 }
 
@@ -537,9 +637,11 @@ mod tests {
                 label: None,
                 arrow_type: ArrowType::SingleArrow,
                 attributes: HashMap::new(),
+                style: None,
             }],
             containers: vec![],
             groups: vec![],
+            connections: vec![],
         };
 
         let igr = IntermediateGraph::from_ast(document).unwrap();
@@ -571,6 +673,7 @@ mod tests {
             edges: vec![],
             containers: vec![],
             groups: vec![],
+            connections: vec![],
         };
 
         let result = IntermediateGraph::from_ast(document);

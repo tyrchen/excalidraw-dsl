@@ -96,13 +96,17 @@ mod tests {
     fn test_generate_file_structure() {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
+            component_types: HashMap::new(),
             nodes: vec![NodeDefinition {
                 id: "test".to_string(),
                 label: Some("Test Node".to_string()),
+                component_type: None,
                 attributes: HashMap::new(),
             }],
             edges: vec![],
             containers: vec![],
+            groups: vec![],
+            connections: vec![],
         };
 
         let igr = IntermediateGraph::from_ast(document).unwrap();

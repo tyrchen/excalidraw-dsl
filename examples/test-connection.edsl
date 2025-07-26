@@ -1,0 +1,10 @@
+A
+B
+
+connection {
+    from: "A";
+    to: "B";
+    style {
+        type: arrow;
+    }
+}

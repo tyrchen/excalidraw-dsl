@@ -157,20 +157,23 @@ async fn handle_websocket_message(
                 .join("\n");
             log::debug!("EDSL preview: {}", preview);
 
-            match state.compiler.compile_to_elements(&edsl_content) {
-                Ok(elements) => match serde_json::to_value(&elements) {
-                    Ok(data) => WebSocketResponse::CompileResult {
-                        id,
-                        success: true,
-                        data: Some(data),
-                        error: None,
-                        duration_ms: start_time.elapsed().as_millis() as u64,
-                    },
+            match state.compiler.compile(&edsl_content) {
+                Ok(excalidraw_json) => match serde_json::from_str::<serde_json::Value>(&excalidraw_json) {
+                    Ok(data) => {
+                        log::info!("WebSocket compilation successful, returning full Excalidraw file");
+                        WebSocketResponse::CompileResult {
+                            id,
+                            success: true,
+                            data: Some(data),
+                            error: None,
+                            duration_ms: start_time.elapsed().as_millis() as u64,
+                        }
+                    }
                     Err(e) => WebSocketResponse::CompileResult {
                         id,
                         success: false,
                         data: None,
-                        error: Some(format!("Serialization error: {}", e)),
+                        error: Some(format!("JSON parsing error: {}", e)),
                         duration_ms: start_time.elapsed().as_millis() as u64,
                     },
                 },

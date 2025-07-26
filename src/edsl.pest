@@ -9,7 +9,16 @@ config = { "---" ~ yaml_content ~ "---" }
 yaml_content = { (!"---" ~ ANY)* }
 
 // Main statements
-statement = { (component_type_def | container_def | group_def | edge_def | node_def) ~ ";"? }
+statement = { 
+    (connection_def | 
+     connections_def | 
+     component_type_def | 
+     container_def | 
+     group_def | 
+     edge_def | 
+     node_def
+    ) ~ ";"? 
+}
 
 // Component type definitions
 component_type_def = {
@@ -24,7 +33,7 @@ component_type_style = {
 shape_type = { "rectangle" | "ellipse" | "diamond" | "cylinder" }
 
 // Node definitions
-node_def = { id ~ label? ~ type_ref? ~ style_block? }
+node_def = { !("connection" | "connections" | "componentType" | "container" | "group") ~ id ~ label? ~ type_ref? ~ style_block? }
 type_ref = { "{" ~ "type" ~ ":" ~ id ~ "}" }
 label = { "[" ~ label_text ~ "]" }
 label_text = @{ (!"[" ~ !"]" ~ !"\"" ~ !NEWLINE ~ ANY)+ }
@@ -33,10 +42,49 @@ label_text = @{ (!"[" ~ !"]" ~ !"\"" ~ !NEWLINE ~ ANY)+ }
 edge_def = { edge_chain | single_edge }
 edge_chain = { node_ref ~ (arrow ~ node_ref)+ ~ edge_label? ~ style_block? }
 single_edge = { node_ref ~ arrow ~ node_ref ~ edge_label? ~ style_block? }
-node_ref = { id ~ label? }
+node_ref = { !("connection" | "connections" | "componentType" | "container" | "group") ~ id ~ label? }
 edge_label = { (":" ~ " "? ~ edge_label_content) | ("{" ~ edge_label_content ~ "}") }
 edge_label_content = @{ string_literal | (!NEWLINE ~ !";" ~ !"{" ~ !"}" ~ ANY)+ }
 arrow = { "->" | "--" | "<->" | "~>" }
+
+// Connection definitions (advanced syntax)
+connection_def = {
+  "connection" ~ "{" ~
+  "from" ~ ":" ~ string_literal ~ ";" ~
+  "to" ~ ":" ~ string_literal ~ ";" ~
+  connection_style ~
+  "}"
+}
+
+connections_def = {
+  "connections" ~ "{" ~
+  "from" ~ ":" ~ string_literal ~ ";" ~
+  "to" ~ ":" ~ "[" ~ connection_targets ~ "]" ~ ";" ~
+  connection_style ~
+  "}"
+}
+
+connection_targets = { string_literal ~ ("," ~ string_literal)* }
+
+connection_style = {
+  "style" ~ "{" ~
+  connection_style_attr* ~
+  "}"
+}
+
+connection_style_attr = {
+  ("type" ~ ":" ~ edge_type ~ ";") |
+  ("label" ~ ":" ~ string_literal ~ ";") |
+  ("labelPosition" ~ ":" ~ number ~ ";") |
+  ("routing" ~ ":" ~ routing_type ~ ";") |
+  ("color" ~ ":" ~ string_literal ~ ";") |
+  ("width" ~ ":" ~ number ~ ";") |
+  ("strokeStyle" ~ ":" ~ stroke_style ~ ";")
+}
+
+edge_type = { "arrow" | "line" | "dashed" | "dotted" }
+routing_type = { "straight" | "orthogonal" | "curved" | "auto" }
+stroke_style = { "solid" | "dashed" | "dotted" }
 
 // Container definitions
 container_def = { 

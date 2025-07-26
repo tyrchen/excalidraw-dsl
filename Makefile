@@ -22,7 +22,7 @@ build-server:
 	@cargo build --features server
 
 run-server:
-	@cargo run --features server -- server --port 3002
+	@RUST_LOG=info cargo run --features server -- server --port 3002
 
 run-ui:
 	@cd ui && yarn dev

@@ -826,15 +826,18 @@ mod tests {
     fn test_generate_from_igr() {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
+            component_types: HashMap::new(),
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),
                     label: Some("Node A".to_string()),
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
                 NodeDefinition {
                     id: "b".to_string(),
                     label: Some("Node B".to_string()),
+                    component_type: None,
                     attributes: HashMap::new(),
                 },
             ],
@@ -844,9 +847,11 @@ mod tests {
                 label: Some("Edge".to_string()),
                 arrow_type: ArrowType::SingleArrow,
                 attributes: HashMap::new(),
+                style: None,
             }],
             containers: vec![],
             groups: vec![],
+            connections: vec![],
         };
 
         let mut igr = IntermediateGraph::from_ast(document).unwrap();
