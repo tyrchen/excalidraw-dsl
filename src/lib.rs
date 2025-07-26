@@ -1,0 +1,201 @@
+// src/lib.rs
+pub mod ast;
+pub mod error;
+pub mod generator;
+pub mod igr;
+pub mod layout;
+pub mod parser;
+
+#[cfg(feature = "llm")]
+pub mod llm;
+
+pub use error::{EDSLError, Result};
+
+use crate::generator::ExcalidrawGenerator;
+use crate::igr::IntermediateGraph;
+use crate::layout::LayoutManager;
+use crate::parser::parse_edsl;
+
+/// The main EDSL compiler that orchestrates parsing, layout, and generation
+pub struct EDSLCompiler {
+    layout_manager: LayoutManager,
+    #[cfg(feature = "llm")]
+    llm_optimizer: Option<llm::LLMLayoutOptimizer>,
+}
+
+impl EDSLCompiler {
+    /// Create a new EDSL compiler with default settings
+    pub fn new() -> Self {
+        Self {
+            layout_manager: LayoutManager::new(),
+            #[cfg(feature = "llm")]
+            llm_optimizer: None,
+        }
+    }
+
+    /// Enable LLM layout optimization with the provided API key
+    #[cfg(feature = "llm")]
+    pub fn with_llm_optimization(mut self, api_key: String) -> Self {
+        self.llm_optimizer = Some(llm::LLMLayoutOptimizer::new(api_key));
+        self
+    }
+
+    /// Compile EDSL source code to Excalidraw JSON
+    pub fn compile(&self, edsl_source: &str) -> Result<String> {
+        // Parse EDSL
+        let parsed_doc = parse_edsl(edsl_source)?;
+
+        // Build intermediate graph representation
+        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+
+        // Apply layout algorithms
+        self.layout_manager.layout(&mut igr)?;
+
+        // Apply LLM optimization if enabled
+        #[cfg(feature = "llm")]
+        if let Some(optimizer) = &self.llm_optimizer {
+            optimizer.optimize_layout(&mut igr, edsl_source)?;
+        }
+
+        // Generate Excalidraw elements
+        let elements = ExcalidrawGenerator::generate(&igr)?;
+
+        // Serialize to JSON
+        serde_json::to_string_pretty(&elements).map_err(|e| EDSLError::Json(e))
+    }
+
+    /// Compile EDSL source code and return raw elements (without JSON serialization)
+    pub fn compile_to_elements(
+        &self,
+        edsl_source: &str,
+    ) -> Result<Vec<generator::ExcalidrawElementSkeleton>> {
+        let parsed_doc = parse_edsl(edsl_source)?;
+        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+
+        self.layout_manager.layout(&mut igr)?;
+
+        #[cfg(feature = "llm")]
+        if let Some(optimizer) = &self.llm_optimizer {
+            optimizer.optimize_layout(&mut igr, edsl_source)?;
+        }
+
+        ExcalidrawGenerator::generate(&igr)
+    }
+
+    /// Parse and validate EDSL source code without generating output
+    pub fn validate(&self, edsl_source: &str) -> Result<()> {
+        let parsed_doc = parse_edsl(edsl_source)?;
+        let _igr = IntermediateGraph::from_ast(parsed_doc)?;
+        Ok(())
+    }
+
+    /// Get the intermediate graph representation for debugging/inspection
+    pub fn get_igr(&self, edsl_source: &str) -> Result<IntermediateGraph> {
+        let parsed_doc = parse_edsl(edsl_source)?;
+        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+        self.layout_manager.layout(&mut igr)?;
+        Ok(igr)
+    }
+}
+
+impl Default for EDSLCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use petgraph::visit::IntoNodeReferences;
+
+    #[test]
+    fn test_basic_compilation() {
+        let edsl = r#"
+---
+layout: dagre
+---
+
+user[User]
+api[API Gateway]
+db[Database] {
+  shape: cylinder;
+}
+
+user -> api -> db
+        "#;
+
+        let compiler = EDSLCompiler::new();
+        let result = compiler.compile(edsl);
+
+        if let Err(e) = &result {
+            eprintln!("Compilation error: {:?}", e);
+        }
+        assert!(result.is_ok());
+        let json = result.unwrap();
+        assert!(json.contains("rectangle")); // User and API Gateway nodes
+        assert!(json.contains("ellipse")); // Database node (cylinder approximated as ellipse)
+        assert!(json.contains("arrow")); // Edges
+    }
+
+    #[test]
+    fn test_container_compilation() {
+        let edsl = r#"
+container "Backend Services" {
+  api[API Gateway]
+  user_service[User Service]
+  api -> user_service;
+}
+        "#;
+
+        let compiler = EDSLCompiler::new();
+        let result = compiler.compile(edsl);
+
+        assert!(result.is_ok());
+        let json = result.unwrap();
+        assert!(json.contains("Backend Services"));
+    }
+
+    #[test]
+    fn test_validation() {
+        let edsl =
+            "web_server[Web Server] {\n    shape: \"rectangle\";\n    strokeColor: \"#ff0000\";\n}";
+
+        let compiler = EDSLCompiler::new();
+        let result = compiler.validate(edsl);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_edsl() {
+        let edsl = r#"
+        node_a -> nonexistent_node
+        "#;
+
+        let compiler = EDSLCompiler::new();
+        let result = compiler.compile(edsl);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_igr() {
+        let edsl = r#"
+        a[Node A]
+        b[Node B]
+        a -> b
+        "#;
+
+        let compiler = EDSLCompiler::new();
+        let igr = compiler.get_igr(edsl).unwrap();
+
+        assert_eq!(igr.graph.node_count(), 2);
+        assert_eq!(igr.graph.edge_count(), 1);
+
+        // Check that layout has been applied (nodes have positions)
+        for (_, node) in igr.graph.node_references() {
+            assert!(node.x != 0.0 || node.y != 0.0); // At least one node should be positioned
+        }
+    }
+}

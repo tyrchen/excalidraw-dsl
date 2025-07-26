@@ -1,0 +1,49 @@
+// edsl.pest - Complete grammar specification for ExcaliDraw-DSL
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
+
+file = { SOI ~ config? ~ statement* ~ EOI }
+
+// YAML frontmatter configuration
+config = { "---" ~ yaml_content ~ "---" }
+yaml_content = { (!"---" ~ ANY)* }
+
+// Main statements
+statement = { (container_def | edge_def | node_def) ~ ";"? }
+
+// Node definitions
+node_def = { id ~ label? ~ style_block? }
+label = { "[" ~ label_text ~ "]" }
+label_text = @{ (!"[" ~ !"]" ~ !"\"" ~ !NEWLINE ~ ANY)+ }
+
+// Edge definitions  
+edge_def = { edge_chain | single_edge }
+edge_chain = { node_ref ~ (arrow ~ node_ref)+ ~ edge_label? ~ style_block? }
+single_edge = { node_ref ~ arrow ~ node_ref ~ edge_label? ~ style_block? }
+node_ref = { id ~ label? }
+edge_label = { ":" ~ " "? ~ edge_label_content }
+edge_label_content = @{ string_literal | (!NEWLINE ~ !";" ~ !"{" ~ ANY)+ }
+arrow = { "->" | "--" | "<->" | "~>" }
+
+// Container definitions
+container_def = { 
+  "container" ~ string_literal? ~ ("as" ~ id)? ~ "{" ~ 
+  container_style? ~ 
+  statement* ~ 
+  "}" 
+}
+container_style = { "style:" ~ style_block }
+
+// Style blocks
+style_block = { "{" ~ attribute* ~ "}" }
+attribute = { property_name ~ ":" ~ property_value ~ ";" }
+property_name = @{ (ASCII_ALPHANUMERIC | "_")+ }
+property_value = { string_literal | number | color | boolean | identifier }
+identifier = @{ (ASCII_ALPHANUMERIC | "_")+ }
+
+// Primitives
+id = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
+string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+color = @{ "#" ~ ASCII_HEX_DIGIT{6} }
+boolean = { "true" | "false" }

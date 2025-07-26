@@ -1,0 +1,29 @@
+---
+layout: dagre
+theme: light
+---
+
+# Simple three-tier architecture example
+user[User] -> web[Web Server] -> db[Database] {
+  shape: cylinder;
+  fill: hachure;
+  strokeColor: "#343a40";
+}
+
+# Container example
+container "Backend Services" as backend {
+  style: {
+    backgroundColor: "#f8f9fa";
+    strokeStyle: dashed;
+  }
+  
+  api[API Gateway]
+  auth[Auth Service]
+  user_service[User Service]
+  
+  api -> auth;
+  api -> user_service;
+}
+
+# Connect to backend
+web -> backend.api
