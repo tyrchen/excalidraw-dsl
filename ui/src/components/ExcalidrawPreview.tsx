@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
+import '@excalidraw/excalidraw/index.css';
 import { useEDSLStore } from '../store/edsl-store';
 import { AlertCircle, Bug, ChevronDown, ChevronUp } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
@@ -16,6 +17,7 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
   const [error, setError] = useState<string | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
+  const [excalidrawKey, setExcalidrawKey] = useState(0);
 
   useEffect(() => {
     console.log('Compilation result received:', compilationResult);
@@ -62,6 +64,8 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
           console.log('Valid Excalidraw elements:', validElements);
           setElements(validElements);
           setError(null);
+          // Force re-render of Excalidraw by changing key
+          setExcalidrawKey(prev => prev + 1);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Failed to render diagram';
           console.error('Error processing elements:', err);
@@ -219,15 +223,20 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
       <div className="flex-1 relative" style={{ height: '100%', minHeight: '400px' }}>
         {elements.length > 0 ? (
           <Excalidraw
+            // Use key to force re-mount when elements change
+            key={excalidrawKey}
             initialData={{
               elements,
               appState: {
                 viewBackgroundColor: appState?.viewBackgroundColor || '#ffffff',
-                scrollX: 0,
-                scrollY: 0,
-                zoom: { value: 1 },
+                currentItemFontFamily: 3,  // Use Cascadia/Code font
+                zoom: {
+                  value: 1,  // Start at 100% zoom
+                },
+                scrollToContent: true,  // Auto-scroll to content
                 ...(appState || {}),
               },
+              scrollToContent: true,  // Ensure content is visible and centered
             }}
             UIOptions={{
               canvasActions: {
@@ -237,8 +246,12 @@ export const ExcalidrawPreview: React.FC<ExcalidrawPreviewProps> = ({ className 
                 loadScene: false,
                 saveToActiveFile: false,
                 saveAsImage: true,
+                theme: true,
               },
             }}
+            viewModeEnabled={false}
+            zenModeEnabled={false}
+            gridModeEnabled={false}
           />
         ) : !isCompiling ? (
           <div className="h-full flex items-center justify-center bg-gray-50">
