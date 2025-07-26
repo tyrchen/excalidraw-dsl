@@ -2,22 +2,77 @@
 use crate::error::{LayoutError, Result};
 use crate::igr::{BoundingBox, IntermediateGraph};
 use petgraph::graph::NodeIndex;
-use petgraph::visit::EdgeRef;
+use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
+use std::sync::Mutex;
 
 pub trait LayoutEngine: Send + Sync {
     fn layout(&self, igr: &mut IntermediateGraph) -> Result<()>;
     fn name(&self) -> &'static str;
 }
 
+/// Cache key for layout results
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+struct LayoutCacheKey {
+    graph_hash: u64,
+    engine: String,
+}
+
+impl LayoutCacheKey {
+    fn from_igr(igr: &IntermediateGraph, engine: &str) -> Self {
+        let mut hasher = DefaultHasher::new();
+        
+        // Hash nodes
+        let mut node_ids: Vec<_> = igr.graph.node_indices()
+            .map(|idx| &igr.graph[idx].id)
+            .collect();
+        node_ids.sort();
+        
+        for id in &node_ids {
+            id.hash(&mut hasher);
+        }
+        
+        // Hash edges
+        let mut edge_pairs: Vec<_> = igr.graph.edge_indices()
+            .map(|idx| {
+                let (source, target) = igr.graph.edge_endpoints(idx).unwrap();
+                (&igr.graph[source].id, &igr.graph[target].id)
+            })
+            .collect();
+        edge_pairs.sort();
+        
+        for (source, target) in &edge_pairs {
+            source.hash(&mut hasher);
+            target.hash(&mut hasher);
+        }
+        
+        Self {
+            graph_hash: hasher.finish(),
+            engine: engine.to_string(),
+        }
+    }
+}
+
+/// Cached layout positions
+#[derive(Clone, Debug)]
+struct CachedLayout {
+    positions: HashMap<String, (f64, f64)>,
+}
+
 pub struct LayoutManager {
     engines: HashMap<String, Box<dyn LayoutEngine>>,
+    cache: Mutex<HashMap<LayoutCacheKey, CachedLayout>>,
+    cache_enabled: bool,
 }
 
 impl LayoutManager {
     pub fn new() -> Self {
         let mut manager = LayoutManager {
             engines: HashMap::new(),
+            cache: Mutex::new(HashMap::new()),
+            cache_enabled: true,
         };
 
         // Register available layout engines
@@ -25,6 +80,16 @@ impl LayoutManager {
         manager.register("force", Box::new(ForceLayout::new()));
 
         manager
+    }
+    
+    pub fn enable_cache(&mut self, enabled: bool) {
+        self.cache_enabled = enabled;
+    }
+    
+    pub fn clear_cache(&self) {
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.clear();
+        }
     }
 
     pub fn register(&mut self, name: &str, engine: Box<dyn LayoutEngine>) {
@@ -39,7 +104,55 @@ impl LayoutManager {
             .get(layout_name)
             .ok_or_else(|| LayoutError::UnknownEngine(layout_name.to_string()))?;
 
-        engine.layout(igr)
+        // Check cache if enabled
+        if self.cache_enabled {
+            let cache_key = LayoutCacheKey::from_igr(igr, layout_name);
+            
+            // Try to get from cache
+            if let Ok(cache) = self.cache.lock() {
+                if let Some(cached_layout) = cache.get(&cache_key) {
+                    // Apply cached positions
+                    let updates: Vec<_> = igr.graph.node_references()
+                        .filter_map(|(node_idx, node_data)| {
+                            cached_layout.positions.get(&node_data.id)
+                                .map(|&(x, y)| (node_idx, x, y))
+                        })
+                        .collect();
+                    
+                    // Apply updates after collecting
+                    for (node_idx, x, y) in updates {
+                        igr.graph[node_idx].x = x;
+                        igr.graph[node_idx].y = y;
+                    }
+                    return Ok(());
+                }
+            }
+            
+            // Not in cache, compute layout
+            engine.layout(igr)?;
+            
+            // Store in cache
+            if let Ok(mut cache) = self.cache.lock() {
+                let mut positions = HashMap::new();
+                for (_, node_data) in igr.graph.node_references() {
+                    positions.insert(node_data.id.clone(), (node_data.x, node_data.y));
+                }
+                
+                // Simple LRU: remove oldest if cache is too large
+                if cache.len() > 100 {
+                    // Remove a random entry (simple eviction)
+                    if let Some(key) = cache.keys().next().cloned() {
+                        cache.remove(&key);
+                    }
+                }
+                
+                cache.insert(cache_key, CachedLayout { positions });
+            }
+            
+            Ok(())
+        } else {
+            engine.layout(igr)
+        }
     }
 }
 

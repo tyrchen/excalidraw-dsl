@@ -1,0 +1,6 @@
+[submodule "excalidraw"]
+	path = excalidraw
+	url = https://github.com/excalidraw/excalidraw
+[submodule "layout"]
+	path = layout
+	url = https://github.com/antvis/layout

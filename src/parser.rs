@@ -5,11 +5,24 @@ use pest::Parser;
 use pest_derive::Parser;
 use std::collections::HashMap;
 
+// Security limits to prevent DoS attacks
+const MAX_INPUT_SIZE: usize = 1_000_000; // 1MB
+const MAX_NODES: usize = 1000;
+const MAX_EDGES: usize = 5000;
+const MAX_CONTAINERS: usize = 100;
+
 #[derive(Parser)]
 #[grammar = "edsl.pest"]
 pub struct EDSLParser;
 
 pub fn parse_edsl(input: &str) -> Result<ParsedDocument> {
+    // Validate input size
+    if input.len() > MAX_INPUT_SIZE {
+        return Err(ParseError::ValidationError(
+            format!("Input size exceeds maximum allowed size of {} bytes", MAX_INPUT_SIZE)
+        ).into());
+    }
+    
     let pairs = EDSLParser::parse(Rule::file, input).map_err(ParseError::PestError)?;
 
     build_document(pairs)
@@ -46,6 +59,25 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
         }
     }
 
+    // Validate complexity limits
+    if nodes.len() > MAX_NODES {
+        return Err(ParseError::ValidationError(
+            format!("Number of nodes ({}) exceeds maximum allowed ({})", nodes.len(), MAX_NODES)
+        ).into());
+    }
+    
+    if edges.len() > MAX_EDGES {
+        return Err(ParseError::ValidationError(
+            format!("Number of edges ({}) exceeds maximum allowed ({})", edges.len(), MAX_EDGES)
+        ).into());
+    }
+    
+    if containers.len() > MAX_CONTAINERS {
+        return Err(ParseError::ValidationError(
+            format!("Number of containers ({}) exceeds maximum allowed ({})", containers.len(), MAX_CONTAINERS)
+        ).into());
+    }
+
     Ok(ParsedDocument {
         config,
         nodes,
@@ -78,13 +110,20 @@ fn parse_config(pair: pest::iterators::Pair<Rule>) -> Result<GlobalConfig> {
 }
 
 fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
-    let inner = pair.into_inner().next().unwrap();
+    let inner = pair.into_inner().next()
+        .ok_or_else(|| ParseError::Syntax {
+            line: 0,
+            message: "Expected statement content".to_string(),
+        })?;
 
     match inner.as_rule() {
         Rule::node_def => Ok(Statement::Node(parse_node_definition(inner)?)),
         Rule::edge_def => Ok(Statement::Edge(parse_edge_definition(inner)?)),
         Rule::container_def => Ok(Statement::Container(parse_container_definition(inner)?)),
-        _ => unreachable!(),
+        _ => Err(ParseError::Syntax {
+            line: 0,
+            message: format!("Unexpected rule in statement: {:?}", inner.as_rule()),
+        }.into()),
     }
 }
 
@@ -121,12 +160,19 @@ fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefini
 }
 
 fn parse_edge_definition(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition> {
-    let inner = pair.into_inner().next().unwrap();
+    let inner = pair.into_inner().next()
+        .ok_or_else(|| ParseError::Syntax {
+            line: 0,
+            message: "Expected edge content".to_string(),
+        })?;
 
     match inner.as_rule() {
         Rule::single_edge => parse_single_edge(inner),
         Rule::edge_chain => parse_edge_chain(inner),
-        _ => unreachable!(),
+        _ => Err(ParseError::Syntax {
+            line: 0,
+            message: format!("Unexpected rule in edge definition: {:?}", inner.as_rule()),
+        }.into()),
     }
 }
 
@@ -283,7 +329,10 @@ fn parse_container_definition(pair: pest::iterators::Pair<Rule>) -> Result<Conta
                 let style_block = inner_pair
                     .into_inner()
                     .find(|p| p.as_rule() == Rule::style_block)
-                    .unwrap();
+                    .ok_or_else(|| ParseError::Syntax {
+                        line: 0,
+                        message: "Expected style block in container style".to_string(),
+                    })?;
                 attributes = parse_style_block(style_block)?;
             }
             Rule::statement => {

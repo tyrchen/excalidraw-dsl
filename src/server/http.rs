@@ -2,14 +2,18 @@
 use crate::{EDSLCompiler, EDSLError, Result};
 use axum::{
     extract::{State, WebSocketUpgrade},
-    http::{header, Method, StatusCode},
+    http::{header, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower::ServiceBuilder;
+use tower_http::{
+    cors::CorsLayer,
+    limit::RequestBodyLimitLayer,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompileRequest {
@@ -69,19 +73,37 @@ impl AppState {
 
 /// Create the main HTTP router
 pub fn create_router(state: AppState) -> Router {
+    // Define allowed origins (configure these based on your deployment)
+    let allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://excalidraw.com",
+        "https://excalidraw-dsl.com",
+    ]
+    .iter()
+    .map(|origin| origin.parse::<HeaderValue>().unwrap())
+    .collect::<Vec<_>>();
+    
     Router::new()
         .route("/health", get(health_handler))
         .route("/api/compile", post(compile_handler))
         .route("/api/validate", post(validate_handler))
         .route("/api/ws", get(websocket_handler))
-        .with_state(state)
         .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
-                .expose_headers([header::CONTENT_TYPE]),
+            ServiceBuilder::new()
+                // Add request body size limit (2MB)
+                .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
+                // Add CORS
+                .layer(
+                    CorsLayer::new()
+                        .allow_origin(allowed_origins)
+                        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+                        .expose_headers([header::CONTENT_TYPE])
+                        .allow_credentials(true),
+                ),
         )
+        .with_state(state)
 }
 
 /// Health check endpoint
