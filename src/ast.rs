@@ -15,7 +15,7 @@ pub const MAX_STROKE_WIDTH: f64 = 20.0;
 pub const VALID_THEMES: &[&str] = &["light", "dark"];
 
 /// Supported layout algorithms
-pub const VALID_LAYOUTS: &[&str] = &["dagre", "force", "manual"];
+pub const VALID_LAYOUTS: &[&str] = &["dagre", "force", "manual", "elk"];
 
 /// Supported font families
 pub const VALID_FONTS: &[&str] = &["Virgil", "Helvetica", "Cascadia"];
@@ -244,6 +244,41 @@ pub struct EdgeDefinition {
     pub arrow_type: ArrowType,
     pub attributes: HashMap<String, AttributeValue>,
     pub style: Option<EdgeStyleDefinition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EdgeChainDefinition {
+    pub nodes: Vec<String>,
+    pub label: Option<String>,
+    pub arrow_type: ArrowType,
+    pub attributes: HashMap<String, AttributeValue>,
+    pub style: Option<EdgeStyleDefinition>,
+}
+
+impl EdgeChainDefinition {
+    /// Expand edge chain into individual edge definitions
+    pub fn expand(&self) -> Vec<EdgeDefinition> {
+        let mut edges = Vec::new();
+
+        for i in 0..self.nodes.len().saturating_sub(1) {
+            let edge_label = if i == 0 {
+                self.label.clone() // Only apply label to first edge
+            } else {
+                None
+            };
+
+            edges.push(EdgeDefinition {
+                from: self.nodes[i].clone(),
+                to: self.nodes[i + 1].clone(),
+                label: edge_label,
+                arrow_type: self.arrow_type,
+                attributes: self.attributes.clone(),
+                style: self.style.clone(),
+            });
+        }
+
+        edges
+    }
 }
 
 #[derive(Debug, Clone)]

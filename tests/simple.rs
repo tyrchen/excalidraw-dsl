@@ -3,7 +3,7 @@ use excalidraw_dsl::EDSLCompiler;
 
 #[test]
 fn test_basic_compilation() {
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     // Test simple nodes and edge
     let edsl = "a[Node A]\nb[Node B]\na -> b";
@@ -18,7 +18,7 @@ fn test_basic_compilation() {
 
 #[test]
 fn test_error_handling() {
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     // Test undefined node reference
     let edsl = "a[Node A]\na -> b";
@@ -32,7 +32,7 @@ fn test_error_handling() {
 
 #[test]
 fn test_compile_to_elements() {
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     let edsl = "a[A]\nb[B]\na -> b";
     let result = compiler.compile_to_elements(edsl);

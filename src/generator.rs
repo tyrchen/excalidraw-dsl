@@ -106,6 +106,9 @@ pub struct ExcalidrawElementSkeleton {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "verticalAlign")]
     pub vertical_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "isContainer")]
+    pub is_container: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -439,6 +442,7 @@ impl ExcalidrawGenerator {
             container_id: None,
             text_align: None,
             vertical_align: None,
+            is_container: None,
         })
     }
 
@@ -536,6 +540,7 @@ impl ExcalidrawGenerator {
             container_id: None,
             text_align: None,
             vertical_align: None,
+            is_container: None,
         })
     }
 
@@ -643,6 +648,7 @@ impl ExcalidrawGenerator {
             container_id: None,
             text_align: None,
             vertical_align: None,
+            is_container: None,
         }))
     }
 
@@ -700,6 +706,7 @@ impl ExcalidrawGenerator {
             container_id: None,
             text_align: None,
             vertical_align: None,
+            is_container: Some(true),
         }))
     }
 
@@ -827,6 +834,7 @@ impl ExcalidrawGenerator {
             container_id: Some(container_id.to_string()),
             text_align: Some(TEXT_ALIGN_CENTER.to_string()),
             vertical_align: Some(VERTICAL_ALIGN_MIDDLE.to_string()),
+            is_container: None,
         })
     }
 

@@ -47,7 +47,7 @@ impl EDSLCompiler {
     }
 
     /// Compile EDSL source code to Excalidraw JSON
-    pub fn compile(&self, edsl_source: &str) -> Result<String> {
+    pub fn compile(&mut self, edsl_source: &str) -> Result<String> {
         // Parse EDSL
         let parsed_doc = parse_edsl(edsl_source)?;
 
@@ -59,7 +59,7 @@ impl EDSLCompiler {
 
         // Apply LLM optimization if enabled
         #[cfg(feature = "llm")]
-        if let Some(optimizer) = &self.llm_optimizer {
+        if let Some(optimizer) = &mut self.llm_optimizer {
             optimizer.optimize_layout(&mut igr, edsl_source)?;
         }
 
@@ -72,7 +72,7 @@ impl EDSLCompiler {
 
     /// Compile EDSL source code and return raw elements (without JSON serialization)
     pub fn compile_to_elements(
-        &self,
+        &mut self,
         edsl_source: &str,
     ) -> Result<Vec<generator::ExcalidrawElementSkeleton>> {
         let parsed_doc = parse_edsl(edsl_source)?;
@@ -81,7 +81,7 @@ impl EDSLCompiler {
         self.layout_manager.layout(&mut igr)?;
 
         #[cfg(feature = "llm")]
-        if let Some(optimizer) = &self.llm_optimizer {
+        if let Some(optimizer) = &mut self.llm_optimizer {
             optimizer.optimize_layout(&mut igr, edsl_source)?;
         }
 
@@ -223,7 +223,7 @@ db[Database] {
 user -> api -> db
         "#;
 
-        let compiler = EDSLCompiler::new();
+        let mut compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl);
 
         if let Err(e) = &result {
@@ -246,7 +246,7 @@ container "Backend Services" {
 }
         "#;
 
-        let compiler = EDSLCompiler::new();
+        let mut compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl);
 
         assert!(result.is_ok());
@@ -271,7 +271,7 @@ container "Backend Services" {
         node_a -> nonexistent_node
         "#;
 
-        let compiler = EDSLCompiler::new();
+        let mut compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl);
 
         assert!(result.is_err());

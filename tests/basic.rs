@@ -5,7 +5,7 @@ use serde_json::Value;
 /// Helper function to compile EDSL and return JSON
 #[allow(clippy::result_large_err)]
 fn compile_to_json(edsl: &str) -> Result<Value> {
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let json_output = compiler.compile(edsl)?;
     Ok(serde_json::from_str(&json_output)?)
 }

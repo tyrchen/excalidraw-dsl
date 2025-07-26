@@ -114,45 +114,11 @@ impl IntermediateGraph {
         let mut all_nodes = document.nodes;
         let mut all_edges = document.edges;
 
-        // Extract nodes and edges from containers
-        for container in &document.containers {
-            for statement in &container.internal_statements {
-                match statement {
-                    Statement::Node(node) => all_nodes.push(node.clone()),
-                    Statement::Edge(edge) => all_edges.push(edge.clone()),
-                    Statement::Container(_) => {
-                        // Nested containers - for now just ignore
-                        // TODO: Handle nested containers
-                    }
-                    Statement::Group(_) => {
-                        // Nested groups - for now just ignore
-                        // TODO: Handle nested groups
-                    }
-                    Statement::Connection(_) => {
-                        // Connections are handled separately
-                    }
-                }
-            }
-        }
+        // Extract nodes and edges from containers (including nested ones)
+        Self::extract_from_containers(&document.containers, &mut all_nodes, &mut all_edges)?;
 
-        // Extract nodes and edges from groups
-        for group in &document.groups {
-            for statement in &group.internal_statements {
-                match statement {
-                    Statement::Node(node) => all_nodes.push(node.clone()),
-                    Statement::Edge(edge) => all_edges.push(edge.clone()),
-                    Statement::Container(_) => {
-                        // Nested containers - for now just ignore
-                    }
-                    Statement::Group(_) => {
-                        // Nested groups - for now just ignore
-                    }
-                    Statement::Connection(_) => {
-                        // Connections are handled separately
-                    }
-                }
-            }
-        }
+        // Extract nodes and edges from groups (including nested ones)
+        Self::extract_from_groups(&document.groups, &mut all_nodes, &mut all_edges)?;
 
         // Build nodes
         for node_def in all_nodes {
@@ -213,6 +179,70 @@ impl IntermediateGraph {
             .get(id)
             .copied()
             .map(move |idx| (idx, &mut self.graph[idx]))
+    }
+
+    /// Recursively extract nodes and edges from containers, handling nesting
+    fn extract_from_containers(
+        containers: &[ContainerDefinition],
+        all_nodes: &mut Vec<NodeDefinition>,
+        all_edges: &mut Vec<EdgeDefinition>,
+    ) -> Result<()> {
+        for container in containers {
+            for statement in &container.internal_statements {
+                match statement {
+                    Statement::Node(node) => all_nodes.push(node.clone()),
+                    Statement::Edge(edge) => all_edges.push(edge.clone()),
+                    Statement::Container(nested_container) => {
+                        // Recursively handle nested containers
+                        Self::extract_from_containers(
+                            &[nested_container.clone()],
+                            all_nodes,
+                            all_edges,
+                        )?;
+                    }
+                    Statement::Group(nested_group) => {
+                        // Handle groups within containers
+                        Self::extract_from_groups(&[nested_group.clone()], all_nodes, all_edges)?;
+                    }
+                    Statement::Connection(_) => {
+                        // Connections are handled separately at top level
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Recursively extract nodes and edges from groups, handling nesting
+    fn extract_from_groups(
+        groups: &[GroupDefinition],
+        all_nodes: &mut Vec<NodeDefinition>,
+        all_edges: &mut Vec<EdgeDefinition>,
+    ) -> Result<()> {
+        for group in groups {
+            for statement in &group.internal_statements {
+                match statement {
+                    Statement::Node(node) => all_nodes.push(node.clone()),
+                    Statement::Edge(edge) => all_edges.push(edge.clone()),
+                    Statement::Container(nested_container) => {
+                        // Handle containers within groups
+                        Self::extract_from_containers(
+                            &[nested_container.clone()],
+                            all_nodes,
+                            all_edges,
+                        )?;
+                    }
+                    Statement::Group(nested_group) => {
+                        // Recursively handle nested groups
+                        Self::extract_from_groups(&[nested_group.clone()], all_nodes, all_edges)?;
+                    }
+                    Statement::Connection(_) => {
+                        // Connections are handled separately at top level
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 

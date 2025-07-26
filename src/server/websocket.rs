@@ -153,7 +153,7 @@ async fn handle_websocket_message(
             let preview = edsl_content.lines().take(3).collect::<Vec<_>>().join("\n");
             log::debug!("EDSL preview: {preview}");
 
-            match state.compiler.compile(&edsl_content) {
+            match state.compiler.lock().unwrap().compile(&edsl_content) {
                 Ok(excalidraw_json) => {
                     match serde_json::from_str::<serde_json::Value>(&excalidraw_json) {
                         Ok(data) => {
@@ -193,7 +193,7 @@ async fn handle_websocket_message(
                 edsl_content.len()
             );
 
-            match state.compiler.validate(&edsl_content) {
+            match state.compiler.lock().unwrap().validate(&edsl_content) {
                 Ok(_) => WebSocketResponse::ValidateResult {
                     id,
                     is_valid: true,

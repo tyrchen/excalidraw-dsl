@@ -9,7 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
 
@@ -87,7 +87,7 @@ pub struct SaveFileResponse {
 /// Application state shared across handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub compiler: Arc<EDSLCompiler>,
+    pub compiler: Arc<Mutex<EDSLCompiler>>,
 }
 
 impl Default for AppState {
@@ -100,7 +100,7 @@ impl AppState {
     pub fn new() -> Self {
         // Use default compiler (LLM optimization disabled by default)
         Self {
-            compiler: Arc::new(EDSLCompiler::new()),
+            compiler: Arc::new(Mutex::new(EDSLCompiler::new())),
         }
     }
 
@@ -109,7 +109,7 @@ impl AppState {
         // Note: LLM optimization disabled in server context due to runtime conflicts
         log::warn!("LLM optimization disabled in server context due to runtime conflicts");
         Self {
-            compiler: Arc::new(EDSLCompiler::new()),
+            compiler: Arc::new(Mutex::new(EDSLCompiler::new())),
         }
     }
 }
@@ -193,7 +193,7 @@ async fn compile_handler(
         .join("\n");
     log::debug!("EDSL content preview:\n{preview}");
 
-    match state.compiler.compile(&req.edsl_content) {
+    match state.compiler.lock().unwrap().compile(&req.edsl_content) {
         Ok(excalidraw_json) => {
             // Parse the JSON string to a Value for the response
             match serde_json::from_str::<serde_json::Value>(&excalidraw_json) {
@@ -250,7 +250,7 @@ async fn validate_handler(
 ) -> Response {
     log::debug!("Validating EDSL content ({} chars)", req.edsl_content.len());
 
-    match state.compiler.validate(&req.edsl_content) {
+    match state.compiler.lock().unwrap().validate(&req.edsl_content) {
         Ok(_) => Json(ValidateResponse {
             is_valid: true,
             error: None,

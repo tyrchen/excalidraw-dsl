@@ -23,7 +23,7 @@ node2[Node 2] {
 node1 -> node2: Connection
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());
@@ -80,7 +80,7 @@ end[End] {
 start -> end: Flow
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());
@@ -119,7 +119,7 @@ b[Node B]
 a -> b: Test Label
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());
@@ -141,7 +141,7 @@ a -> b: Test Label
 fn test_invalid_edsl_syntax() {
     let edsl_content = "node1[Invalid Node] -> {{{{{ invalid syntax";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_err());
@@ -161,7 +161,7 @@ node1[Node 1]
 node1 -> unknown_node: Connection
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_err());
@@ -185,7 +185,7 @@ b -> c
 c -> a  # Creates a cycle
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_err());
@@ -215,7 +215,7 @@ b -> c
 c -> a  # Creates a cycle - should work with force layout
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());
@@ -266,7 +266,7 @@ test -> test2: Connection
     fs::write(&input_path, edsl_content).unwrap();
 
     // Compile using the CLI-like interface
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let input_content = fs::read_to_string(&input_path).unwrap();
     let output_json = compiler.compile(&input_content).unwrap();
 
@@ -298,7 +298,7 @@ long[This is a very long text that should make the node wider]
 short -> medium -> long
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());
@@ -351,7 +351,7 @@ external[External Node]
 external -> internal1: External Connection
 ";
 
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
     let result = compiler.compile(edsl_content);
 
     assert!(result.is_ok());

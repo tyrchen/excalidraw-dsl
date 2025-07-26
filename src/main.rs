@@ -205,7 +205,7 @@ fn run_convert(args: ConvertArgs) -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Create compiler
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     // Validate mode
     if args.validate {
@@ -310,7 +310,7 @@ fn run_validate(args: ValidateArgs) -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Create compiler and validate
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     match compiler.validate(&input_content) {
         Ok(()) => {
@@ -446,7 +446,7 @@ fn compile_file(
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let input_content = std::fs::read_to_string(input_path)?;
-    let compiler = EDSLCompiler::new();
+    let mut compiler = EDSLCompiler::new();
 
     if verbose {
         println!(

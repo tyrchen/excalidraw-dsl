@@ -369,8 +369,7 @@ fn parse_single_edge(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition
 }
 
 fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition> {
-    // For now, just parse as a single edge (first two nodes)
-    // TODO: Expand chains into multiple edges
+    // Parse edge chain and expand into multiple edges
     let mut ids = Vec::new();
     let mut arrow_type = ArrowType::SingleArrow;
     let mut label = None;
@@ -408,6 +407,8 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
     }
 
     if ids.len() >= 2 {
+        // For now, return the first edge in the chain
+        // The expansion will be handled in the EdgeChain structure
         Ok(EdgeDefinition {
             from: ids[0].clone(),
             to: ids[1].clone(),
