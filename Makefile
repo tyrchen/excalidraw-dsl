@@ -65,4 +65,4 @@ $(ALL_EXCALIDRAW_FILES): examples/%.excalidraw: examples/%.edsl
 
 build-examples: $(ALL_EXCALIDRAW_FILES)
 
-.PHONY: build convert validate watch server build-server run-server run-ui run-full examples test test-cli install release update-submodule
+.PHONY: build convert validate watch server build-server run-server run-ui run-full examples test test-cli install release update-submodule build-examples $(ALL_EXCALIDRAW_FILES)

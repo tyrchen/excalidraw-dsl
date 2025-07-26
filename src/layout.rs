@@ -4,7 +4,7 @@ use crate::igr::{BoundingBox, IntermediateGraph};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use petgraph::Direction as PetDirection;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use std::sync::Mutex;
@@ -486,46 +486,97 @@ impl DagreLayout {
 
     // Assign positions within each layer
     fn assign_node_positions_within_layers(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) {
-        for layer in layers {
+        // Track which paths nodes belong to for better separation
+        let mut path_groups: HashMap<NodeIndex, usize> = HashMap::new();
+        let mut next_path_id = 0;
+        
+        // Assign path IDs based on connectivity
+        for (_layer_idx, layer) in layers.iter().enumerate() {
+            for &node_idx in layer {
+                // Check if this node has an assigned path from a parent
+                let incoming_paths: HashSet<usize> = igr.graph
+                    .edges_directed(node_idx, PetDirection::Incoming)
+                    .filter_map(|edge| path_groups.get(&edge.source()).copied())
+                    .collect();
+                
+                let path_id = if incoming_paths.is_empty() {
+                    // New path starting from this node
+                    let id = next_path_id;
+                    next_path_id += 1;
+                    id
+                } else if incoming_paths.len() == 1 {
+                    // Continue on the same path
+                    *incoming_paths.iter().next().unwrap()
+                } else {
+                    // Multiple paths converging - take the smallest path ID
+                    *incoming_paths.iter().min().unwrap()
+                };
+                
+                path_groups.insert(node_idx, path_id);
+            }
+        }
+        
+        for (_layer_idx, layer) in layers.iter().enumerate() {
             if layer.is_empty() {
                 continue;
             }
 
-            // Calculate total size needed for this layer
-            let (total_size, node_sizes) = match self.options.direction {
-                Direction::LeftRight | Direction::RightLeft => {
-                    let sizes: Vec<f64> = layer.iter().map(|&idx| igr.graph[idx].height).collect();
-                    let total: f64 = sizes.iter().sum();
-                    (total, sizes)
-                }
-                Direction::TopBottom | Direction::BottomTop => {
-                    let sizes: Vec<f64> = layer.iter().map(|&idx| igr.graph[idx].width).collect();
-                    let total: f64 = sizes.iter().sum();
-                    (total, sizes)
-                }
-            };
-
-            let total_spacing = (layer.len().saturating_sub(1)) as f64 * self.options.node_sep;
-            let layer_span = total_size + total_spacing;
+            // Group nodes by their path
+            let mut nodes_by_path: HashMap<usize, Vec<(NodeIndex, f64)>> = HashMap::new();
+            
+            for &node_idx in layer {
+                let node = &igr.graph[node_idx];
+                let size = match self.options.direction {
+                    Direction::LeftRight | Direction::RightLeft => node.height,
+                    Direction::TopBottom | Direction::BottomTop => node.width,
+                };
+                
+                let path_id = path_groups.get(&node_idx).copied().unwrap_or(0);
+                nodes_by_path.entry(path_id).or_default().push((node_idx, size));
+            }
+            
+            // Sort paths by ID for consistent ordering
+            let mut paths: Vec<_> = nodes_by_path.into_iter().collect();
+            paths.sort_by_key(|(path_id, _)| *path_id);
+            
+            // Calculate total size needed for this layer with extra spacing between paths
+            let path_separation = self.options.node_sep * 2.0; // Extra space between different paths
+            let mut total_size = 0.0;
+            
+            for (_, nodes) in &paths {
+                total_size += nodes.iter().map(|(_, size)| size).sum::<f64>();
+                total_size += (nodes.len().saturating_sub(1)) as f64 * self.options.node_sep;
+            }
+            total_size += (paths.len().saturating_sub(1)) as f64 * path_separation;
 
             // Start positioning from the center
-            let mut current_pos = -layer_span / 2.0;
+            let mut current_pos = -total_size / 2.0;
 
-            // Position each node in the layer
-            for (i, &node_idx) in layer.iter().enumerate() {
-                let node = &mut igr.graph[node_idx];
-                let size = node_sizes[i];
-                
-                match self.options.direction {
-                    Direction::LeftRight | Direction::RightLeft => {
-                        node.y = current_pos + size / 2.0;
-                    }
-                    Direction::TopBottom | Direction::BottomTop => {
-                        node.x = current_pos + size / 2.0;
-                    }
+            // Position each path group
+            for (path_idx, (_path_id, nodes)) in paths.iter().enumerate() {
+                if path_idx > 0 {
+                    current_pos += path_separation;
                 }
+                
+                // Position nodes within this path
+                for (i, &(node_idx, size)) in nodes.iter().enumerate() {
+                    if i > 0 {
+                        current_pos += self.options.node_sep;
+                    }
+                    
+                    let node = &mut igr.graph[node_idx];
+                    
+                    match self.options.direction {
+                        Direction::LeftRight | Direction::RightLeft => {
+                            node.y = current_pos + size / 2.0;
+                        }
+                        Direction::TopBottom | Direction::BottomTop => {
+                            node.x = current_pos + size / 2.0;
+                        }
+                    }
 
-                current_pos += size + self.options.node_sep;
+                    current_pos += size;
+                }
             }
         }
     }

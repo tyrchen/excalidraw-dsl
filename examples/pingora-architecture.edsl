@@ -1,0 +1,182 @@
+---
+layout: dagre
+direction: LR
+nodeSpacing: 80
+rankSpacing: 120
+theme: light
+---
+
+# System Architecture (Pingora)
+
+# Client Side
+container "Client Side" as client_side {
+  style: {
+    backgroundColor: "#e0f2fe";
+    strokeColor: "#0284c7";
+    strokeStyle: solid;
+    fill: "lines";
+  }
+  
+  client_app[Client Application] {
+    backgroundColor: "#dbeafe";
+    strokeColor: "#3b82f6";
+    width: 160;
+    height: 60;
+  }
+}
+
+# DFW Proxy Layer
+container "DFW Proxy Layer" as dfw_proxy {
+  style: {
+    backgroundColor: "#dcfce7";
+    strokeColor: "#16a34a";
+    strokeStyle: solid;
+    strokeWidth: 2;
+    fill: "lines";
+  }
+  
+  data_firewall[Data Firewall] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 140;
+    height: 60;
+  }
+  
+  # Core Components
+  proxy_manager[Proxy Manager] {
+    backgroundColor: "#e5e7eb";
+    strokeColor: "#6b7280";
+    width: 120;
+    height: 50;
+  }
+  
+  jwt_validator[JWT Auth Validator] {
+    backgroundColor: "#fecaca";
+    strokeColor: "#ef4444";
+    width: 140;
+    height: 50;
+  }
+  
+  rate_limiter[Rate Limiter] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f97316";
+    width: 120;
+    height: 50;
+  }
+  
+  circuit_breaker[Circuit Breaker] {
+    backgroundColor: "#e9d5ff";
+    strokeColor: "#a855f7";
+    width: 130;
+    height: 50;
+  }
+  
+  security_headers[Security Headers] {
+    backgroundColor: "#fef3c7";
+    strokeColor: "#f59e0b";
+    width: 130;
+    height: 50;
+  }
+  
+  # Plugin System
+  json_rpc_plugin[JSON-RPC Plugin] {
+    backgroundColor: "#bfdbfe";
+    strokeColor: "#3b82f6";
+    width: 130;
+    height: 50;
+  }
+  
+  grpc_plugin[gRPC Plugin] {
+    backgroundColor: "#bfdbfe";
+    strokeColor: "#3b82f6";
+    width: 120;
+    height: 50;
+  }
+  
+  statsig_plugin[Statsig Plugin] {
+    backgroundColor: "#bfdbfe";
+    strokeColor: "#3b82f6";
+    width: 130;
+    height: 50;
+  }
+  
+  # Services
+  health_service[Health Service] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 140;
+    height: 50;
+  }
+  
+  reloader_service[Reloader Service] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 150;
+    height: 50;
+  }
+  
+  signal_service[Signal Service] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 140;
+    height: 50;
+  }
+}
+
+# Backend Services
+container "Backend Services" as backend_services {
+  style: {
+    backgroundColor: "#f3f4f6";
+    strokeColor: "#374151";
+    strokeStyle: solid;
+    fill: "lines";
+  }
+  
+  api_server_1[API Server 1] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 140;
+    height: 60;
+  }
+  
+  api_server_2[API Server 2] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    width: 140;
+    height: 60;
+  }
+  
+  grpc_server[gRPC Server] {
+    backgroundColor: "#bfdbfe";
+    strokeColor: "#3b82f6";
+    width: 140;
+    height: 60;
+  }
+}
+
+# Client to Proxy connections
+client_app -> data_firewall: "HTTPS/H2";
+
+# Firewall to Proxy Manager
+data_firewall -> proxy_manager;
+
+# Core Components connections
+proxy_manager -> jwt_validator;
+proxy_manager -> rate_limiter;
+proxy_manager -> circuit_breaker;
+proxy_manager -> security_headers;
+
+# Plugin connections
+proxy_manager -> json_rpc_plugin;
+proxy_manager -> grpc_plugin;
+proxy_manager -> statsig_plugin;
+
+# Proxy to Backend connections
+json_rpc_plugin -> api_server_1: "Load Balance";
+json_rpc_plugin -> api_server_2: "Load Balance";
+grpc_plugin -> grpc_server: "H2/H2C";
+
+# Service connections (these are internal to the proxy)
+proxy_manager -- health_service;
+proxy_manager -- reloader_service;
+proxy_manager -- signal_service;

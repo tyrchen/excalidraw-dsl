@@ -219,7 +219,7 @@ impl NodeData {
         let text_height = font_size * 1.3; // Slightly more height for better appearance
         
         // Increased padding for better text visibility and node appearance
-        let padding_x = 50.0; // More horizontal padding
+        let padding_x = 75.0; // Even more horizontal padding to prevent text overflow
         let padding_y = 25.0; // More vertical padding
         
         let estimated_width = attributes
