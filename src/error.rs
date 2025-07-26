@@ -1,6 +1,4 @@
 // src/error.rs
-#![allow(clippy::large_enum_variant)]
-#![allow(clippy::result_large_err)]
 
 use thiserror::Error;
 
@@ -31,8 +29,11 @@ pub enum EDSLError {
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_yaml::Error),
 
-    #[error("Validation error: {0}")]
-    Validation(String),
+    #[error("Validation error: {message}")]
+    Validation { message: String },
+
+    #[error("Configuration error: {message}")]
+    Configuration { message: String },
 }
 
 #[derive(Error, Debug)]
@@ -44,7 +45,7 @@ pub enum ParseError {
     InvalidConfig(String),
 
     #[error("Pest parsing failed: {0}")]
-    PestError(#[from] pest::error::Error<crate::parser::Rule>),
+    PestError(#[from] Box<pest::error::Error<crate::parser::Rule>>),
 
     #[error("Validation error: {0}")]
     ValidationError(String),

@@ -25,7 +25,8 @@ pub fn parse_edsl(input: &str) -> Result<ParsedDocument> {
         .into());
     }
 
-    let pairs = EDSLParser::parse(Rule::file, input).map_err(ParseError::PestError)?;
+    let pairs =
+        EDSLParser::parse(Rule::file, input).map_err(|e| ParseError::PestError(Box::new(e)))?;
 
     build_document(pairs)
 }

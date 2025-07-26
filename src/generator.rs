@@ -6,6 +6,21 @@ use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+// String constants to avoid repeated allocations
+const EXCALIDRAW_TYPE: &str = "excalidraw";
+const EXCALIDRAW_SOURCE: &str = "https://excalidraw-dsl.com";
+const DEFAULT_BACKGROUND_COLOR: &str = "#ffffff";
+const DEFAULT_STROKE_COLOR: &str = "#000000";
+const DEFAULT_FILL_STYLE: &str = "solid";
+const DEFAULT_STROKE_STYLE: &str = "solid";
+const TEXT_ALIGN_CENTER: &str = "center";
+const VERTICAL_ALIGN_MIDDLE: &str = "middle";
+const ELEMENT_TYPE_RECTANGLE: &str = "rectangle";
+const ELEMENT_TYPE_ELLIPSE: &str = "ellipse";
+const ELEMENT_TYPE_DIAMOND: &str = "diamond";
+const ELEMENT_TYPE_ARROW: &str = "arrow";
+const ELEMENT_TYPE_TEXT: &str = "text";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExcalidrawFile {
     pub r#type: String,
@@ -101,20 +116,59 @@ pub struct ElementBinding {
     pub gap: i32,
 }
 
+/// Generator for converting intermediate graph representation to Excalidraw format
+///
+/// The ExcalidrawGenerator is responsible for the final step in the EDSL compilation
+/// pipeline - converting the laid-out intermediate graph into Excalidraw JSON format
+/// that can be imported into the Excalidraw application.
+///
+/// # Design
+///
+/// The generator performs several key transformations:
+/// - Converts node positions to Excalidraw coordinates
+/// - Maps EDSL styling attributes to Excalidraw properties
+/// - Generates text elements for node labels
+/// - Creates arrow elements for edges with proper bindings
+/// - Handles containers and groups as frame elements
+///
+/// # Performance
+///
+/// The generator uses string constants to minimize allocations and employs
+/// efficient data structures for element generation.
 pub struct ExcalidrawGenerator;
 
 impl ExcalidrawGenerator {
+    /// Generate a complete Excalidraw file from an intermediate graph
+    ///
+    /// This is the main entry point for the generator. It creates a complete
+    /// Excalidraw file structure including metadata, app state, and all elements.
+    ///
+    /// # Arguments
+    /// * `igr` - The intermediate graph representation containing positioned nodes and edges
+    ///
+    /// # Returns
+    /// * `Ok(ExcalidrawFile)` - Complete Excalidraw file ready for serialization
+    /// * `Err(GeneratorError)` - If element generation fails
+    ///
+    /// # Examples
+    /// ```rust
+    /// use excalidraw_dsl::generator::ExcalidrawGenerator;
+    /// use excalidraw_dsl::igr::IntermediateGraph;
+    ///
+    /// let igr = IntermediateGraph::new();
+    /// let file = ExcalidrawGenerator::generate_file(&igr).unwrap();
+    /// ```
     pub fn generate_file(igr: &IntermediateGraph) -> Result<ExcalidrawFile> {
         let elements = Self::generate(igr)?;
 
         Ok(ExcalidrawFile {
-            r#type: "excalidraw".to_string(),
+            r#type: EXCALIDRAW_TYPE.to_string(),
             version: 2,
-            source: "https://excalidraw-dsl.com".to_string(),
+            source: EXCALIDRAW_SOURCE.to_string(),
             elements,
             app_state: AppState {
                 grid_size: None,
-                view_background_color: "#ffffff".to_string(),
+                view_background_color: DEFAULT_BACKGROUND_COLOR.to_string(),
             },
             files: serde_json::json!({}),
         })
@@ -146,7 +200,7 @@ impl ExcalidrawGenerator {
                             // Add reference to text element in the group's boundElements
                             group_element.bound_elements.push(serde_json::json!({
                                 "id": text_element.id.clone(),
-                                "type": "text"
+                                "type": ELEMENT_TYPE_TEXT
                             }));
 
                             elements.push(group_element);
@@ -184,7 +238,7 @@ impl ExcalidrawGenerator {
                             // Add reference to text element in the container's boundElements
                             container_element.bound_elements.push(serde_json::json!({
                                 "id": text_element.id.clone(),
-                                "type": "text"
+                                "type": ELEMENT_TYPE_TEXT
                             }));
 
                             elements.push(container_element);
@@ -229,7 +283,7 @@ impl ExcalidrawGenerator {
                     // Add reference to text element in the shape's boundElements
                     element.bound_elements.push(serde_json::json!({
                         "id": text_element.id.clone(),
-                        "type": "text"
+                        "type": ELEMENT_TYPE_TEXT
                     }));
 
                     elements.push(element);
@@ -277,7 +331,7 @@ impl ExcalidrawGenerator {
                     .bound_elements
                     .push(serde_json::json!({
                         "id": edge_id.clone(),
-                        "type": "arrow"
+                        "type": ELEMENT_TYPE_ARROW
                     }));
             }
 
@@ -287,7 +341,7 @@ impl ExcalidrawGenerator {
                     .bound_elements
                     .push(serde_json::json!({
                         "id": edge_id.clone(),
-                        "type": "arrow"
+                        "type": ELEMENT_TYPE_ARROW
                     }));
             }
 
@@ -299,11 +353,11 @@ impl ExcalidrawGenerator {
 
     fn generate_node(node_data: &NodeData, element_id: &str) -> Result<ExcalidrawElementSkeleton> {
         let shape_type = match node_data.attributes.shape.as_deref() {
-            Some("rectangle") | None => "rectangle",
-            Some("ellipse") => "ellipse",
-            Some("diamond") => "diamond",
-            Some("cylinder") => "ellipse", // Approximate with ellipse for now
-            Some("text") => "text",
+            Some("rectangle") | None => ELEMENT_TYPE_RECTANGLE,
+            Some("ellipse") => ELEMENT_TYPE_ELLIPSE,
+            Some("diamond") => ELEMENT_TYPE_DIAMOND,
+            Some("cylinder") => ELEMENT_TYPE_ELLIPSE, // Approximate with ellipse for now
+            Some("text") => ELEMENT_TYPE_TEXT,
             shape => {
                 return Err(GeneratorError::InvalidElementType(
                     shape.unwrap_or("unknown").to_string(),
@@ -333,7 +387,7 @@ impl ExcalidrawGenerator {
                 .attributes
                 .stroke_color
                 .clone()
-                .unwrap_or_else(|| "#000000".to_string()),
+                .unwrap_or_else(|| DEFAULT_STROKE_COLOR.to_string()),
             background_color: node_data
                 .attributes
                 .background_color
@@ -362,7 +416,7 @@ impl ExcalidrawGenerator {
             is_deleted: false,
             group_ids: vec![],
             frame_id: None,
-            roundness: if shape_type == "rectangle" {
+            roundness: if shape_type == ELEMENT_TYPE_RECTANGLE {
                 if let Some(rounded) = node_data.attributes.rounded {
                     // Convert rounded value to Excalidraw format
                     // Excalidraw uses a radius value for rounded corners
@@ -370,7 +424,7 @@ impl ExcalidrawGenerator {
                 } else {
                     Some(serde_json::json!({"type": 3}))
                 }
-            } else if shape_type == "ellipse" {
+            } else if shape_type == ELEMENT_TYPE_ELLIPSE {
                 Some(serde_json::json!({"type": 2}))
             } else {
                 None
@@ -426,9 +480,9 @@ impl ExcalidrawGenerator {
                 .attributes
                 .stroke_color
                 .clone()
-                .unwrap_or_else(|| "#000000".to_string()),
+                .unwrap_or_else(|| DEFAULT_STROKE_COLOR.to_string()),
             background_color: "transparent".to_string(),
-            fill_style: "solid".to_string(),
+            fill_style: DEFAULT_FILL_STYLE.to_string(),
             stroke_width: edge_data.attributes.stroke_width.unwrap_or(2.0).round() as i32,
             stroke_style: Self::convert_stroke_style(&edge_data.attributes.stroke_style),
             roughness: edge_data.attributes.roughness.unwrap_or(0),
@@ -448,13 +502,13 @@ impl ExcalidrawGenerator {
             }),
             start_arrowhead: Self::convert_arrowhead(&edge_data.attributes.start_arrowhead)
                 .or_else(|| match edge_data.arrow_type {
-                    ArrowType::DoubleArrow => Some("arrow".to_string()),
+                    ArrowType::DoubleArrow => Some(ELEMENT_TYPE_ARROW.to_string()),
                     _ => None,
                 }),
             end_arrowhead: Self::convert_arrowhead(&edge_data.attributes.end_arrowhead).or_else(
                 || match edge_data.arrow_type {
-                    ArrowType::SingleArrow => Some("arrow".to_string()),
-                    ArrowType::DoubleArrow => Some("arrow".to_string()),
+                    ArrowType::SingleArrow => Some(ELEMENT_TYPE_ARROW.to_string()),
+                    ArrowType::DoubleArrow => Some(ELEMENT_TYPE_ARROW.to_string()),
                     _ => None,
                 },
             ),
@@ -550,7 +604,7 @@ impl ExcalidrawGenerator {
         };
 
         Ok(Some(ExcalidrawElementSkeleton {
-            r#type: "rectangle".to_string(),
+            r#type: ELEMENT_TYPE_RECTANGLE.to_string(),
             id: format!("group_{}", Uuid::new_v4()),
             x: bounds.x.round() as i32,
             y: bounds.y.round() as i32,
@@ -599,7 +653,7 @@ impl ExcalidrawGenerator {
         };
 
         Ok(Some(ExcalidrawElementSkeleton {
-            r#type: "rectangle".to_string(),
+            r#type: ELEMENT_TYPE_RECTANGLE.to_string(),
             id: format!("container_{}", Uuid::new_v4()),
             x: bounds.x.round() as i32,
             y: bounds.y.round() as i32,
@@ -652,14 +706,14 @@ impl ExcalidrawGenerator {
     fn convert_fill_style(fill_style: &Option<FillStyle>) -> String {
         match fill_style {
             Some(fill) => fill.to_excalidraw_style().to_string(),
-            None => "solid".to_string(),
+            None => DEFAULT_FILL_STYLE.to_string(),
         }
     }
 
     fn convert_stroke_style(stroke_style: &Option<StrokeStyle>) -> String {
         match stroke_style {
             Some(style) => style.to_excalidraw_style().to_string(),
-            None => "solid".to_string(),
+            None => DEFAULT_FILL_STYLE.to_string(),
         }
     }
 
@@ -734,18 +788,18 @@ impl ExcalidrawGenerator {
         let text_y = (y - text_height as f64 / 2.0).round() as i32;
 
         Ok(ExcalidrawElementSkeleton {
-            r#type: "text".to_string(),
+            r#type: ELEMENT_TYPE_TEXT.to_string(),
             id: format!("text_{}", Uuid::new_v4()),
             x: text_x,
             y: text_y,
             width: text_width,
             height: text_height,
             angle: 0,
-            stroke_color: "#000000".to_string(),
+            stroke_color: DEFAULT_STROKE_COLOR.to_string(),
             background_color: "transparent".to_string(),
-            fill_style: "solid".to_string(),
+            fill_style: DEFAULT_FILL_STYLE.to_string(),
             stroke_width: 0,
-            stroke_style: "solid".to_string(),
+            stroke_style: DEFAULT_STROKE_STYLE.to_string(),
             roughness: 0,
             opacity: 100,
             text: Some(text.to_string()),
@@ -771,8 +825,8 @@ impl ExcalidrawGenerator {
             link: None,
             locked: false,
             container_id: Some(container_id.to_string()),
-            text_align: Some("center".to_string()),
-            vertical_align: Some("middle".to_string()),
+            text_align: Some(TEXT_ALIGN_CENTER.to_string()),
+            vertical_align: Some(VERTICAL_ALIGN_MIDDLE.to_string()),
         })
     }
 
@@ -846,7 +900,7 @@ mod tests {
 
         let result = ExcalidrawGenerator::generate_node(&node_data, "test_id").unwrap();
 
-        assert_eq!(result.r#type, "rectangle");
+        assert_eq!(result.r#type, ELEMENT_TYPE_RECTANGLE);
         assert_eq!(result.text, Some("Test Node".to_string()));
         assert_eq!(result.x, 40); // 100 - 60 (half width)
         assert_eq!(result.y, 70); // 100 - 30 (half height)
@@ -902,18 +956,21 @@ mod tests {
         // Check node elements
         let node_elements: Vec<_> = elements
             .iter()
-            .filter(|e| e.r#type == "rectangle")
+            .filter(|e| e.r#type == ELEMENT_TYPE_RECTANGLE)
             .collect();
         assert_eq!(node_elements.len(), 2);
 
         // Check edge elements
-        let edge_elements: Vec<_> = elements.iter().filter(|e| e.r#type == "arrow").collect();
+        let edge_elements: Vec<_> = elements
+            .iter()
+            .filter(|e| e.r#type == ELEMENT_TYPE_ARROW)
+            .collect();
         assert_eq!(edge_elements.len(), 1);
 
         let edge = &edge_elements[0];
         assert_eq!(edge.text, Some("Edge".to_string()));
         assert!(edge.start_binding.is_some());
         assert!(edge.end_binding.is_some());
-        assert_eq!(edge.end_arrowhead, Some("arrow".to_string()));
+        assert_eq!(edge.end_arrowhead, Some(ELEMENT_TYPE_ARROW.to_string()));
     }
 }

@@ -112,20 +112,22 @@ impl EDSLCompiler {
                             Self::validate_excalidraw_element(element, i)?;
                         }
                     } else {
-                        return Err(EDSLError::Validation(
-                            "Missing 'elements' array in Excalidraw format".into(),
-                        ));
+                        return Err(EDSLError::Validation {
+                            message: "Missing 'elements' array in Excalidraw format".into(),
+                        });
                     }
                 } else {
-                    return Err(EDSLError::Validation(
-                        "Invalid Excalidraw format: missing or incorrect 'type' field".into(),
-                    ));
+                    return Err(EDSLError::Validation {
+                        message: "Invalid Excalidraw format: missing or incorrect 'type' field"
+                            .into(),
+                    });
                 }
             }
             _ => {
-                return Err(EDSLError::Validation(
-                    "Invalid Excalidraw format: expected object with type 'excalidraw'".into(),
-                ));
+                return Err(EDSLError::Validation {
+                    message: "Invalid Excalidraw format: expected object with type 'excalidraw'"
+                        .into(),
+                });
             }
         }
 
@@ -133,17 +135,17 @@ impl EDSLCompiler {
     }
 
     fn validate_excalidraw_element(element: &serde_json::Value, index: usize) -> Result<()> {
-        let obj = element
-            .as_object()
-            .ok_or_else(|| EDSLError::Validation(format!("Element {index} is not an object")))?;
+        let obj = element.as_object().ok_or_else(|| EDSLError::Validation {
+            message: format!("Element {index} is not an object"),
+        })?;
 
         // Required fields
         let required_fields = ["type", "id", "x", "y"];
         for field in &required_fields {
             if !obj.contains_key(*field) {
-                return Err(EDSLError::Validation(format!(
-                    "Element {index} missing required field '{field}'"
-                )));
+                return Err(EDSLError::Validation {
+                    message: format!("Element {index} missing required field '{field}'"),
+                });
             }
         }
 
@@ -152,9 +154,9 @@ impl EDSLCompiler {
             match type_val {
                 "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "text" => {}
                 _ => {
-                    return Err(EDSLError::Validation(format!(
-                        "Element {index} has invalid type '{type_val}'"
-                    )))
+                    return Err(EDSLError::Validation {
+                        message: format!("Element {index} has invalid type '{type_val}'"),
+                    })
                 }
             }
         }
@@ -173,9 +175,9 @@ impl EDSLCompiler {
         for field in &numeric_fields {
             if let Some(val) = obj.get(*field) {
                 if !val.is_number() {
-                    return Err(EDSLError::Validation(format!(
-                        "Element {index} field '{field}' must be a number"
-                    )));
+                    return Err(EDSLError::Validation {
+                        message: format!("Element {index} field '{field}' must be a number"),
+                    });
                 }
             }
         }

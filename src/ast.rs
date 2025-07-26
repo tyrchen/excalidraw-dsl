@@ -1,16 +1,200 @@
 // src/ast.rs
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::str::FromStr;
 
+/// Maximum allowed sketchiness value
+pub const MAX_SKETCHINESS: u8 = 4;
+
+/// Valid range for stroke width
+pub const MIN_STROKE_WIDTH: f64 = 0.1;
+pub const MAX_STROKE_WIDTH: f64 = 20.0;
+
+/// Supported theme values
+pub const VALID_THEMES: &[&str] = &["light", "dark"];
+
+/// Supported layout algorithms
+pub const VALID_LAYOUTS: &[&str] = &["dagre", "force", "manual"];
+
+/// Supported font families
+pub const VALID_FONTS: &[&str] = &["Virgil", "Helvetica", "Cascadia"];
+
+/// Global configuration settings for the EDSL document
+///
+/// Controls overall rendering and layout behavior. All fields are optional
+/// and will use sensible defaults if not specified.
+///
+/// # Examples
+///
+/// ```rust
+/// use excalidraw_dsl::ast::GlobalConfig;
+///
+/// let config = GlobalConfig::builder()
+///     .theme("dark")
+///     .layout("dagre")
+///     .sketchiness(2).unwrap()
+///     .build();
+/// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GlobalConfig {
+    /// Theme for the document ("light" or "dark")
     pub theme: Option<String>,
+    /// Layout algorithm to use ("dagre", "force", "manual")
     pub layout: Option<String>,
+    /// Default font family ("Virgil", "Helvetica", "Cascadia")
     pub font: Option<String>,
+    /// Hand-drawn style intensity (0-4, where 0 is precise and 4 is very sketchy)
     pub sketchiness: Option<u8>,
+    /// Default stroke width in pixels (0.1-20.0)
     pub stroke_width: Option<f64>,
+    /// Background color for the document
     pub background_color: Option<String>,
+}
+
+impl GlobalConfig {
+    /// Create a new builder for GlobalConfig
+    pub fn builder() -> GlobalConfigBuilder {
+        GlobalConfigBuilder::new()
+    }
+
+    /// Validate the configuration values
+    pub fn validate(&self) -> crate::error::Result<()> {
+        // Validate theme
+        if let Some(ref theme) = self.theme {
+            if !VALID_THEMES.contains(&theme.as_str()) {
+                return Err(crate::error::EDSLError::Validation {
+                    message: format!(
+                        "Invalid theme '{}', must be one of: {}",
+                        theme,
+                        VALID_THEMES.join(", ")
+                    ),
+                });
+            }
+        }
+
+        // Validate layout
+        if let Some(ref layout) = self.layout {
+            if !VALID_LAYOUTS.contains(&layout.as_str()) {
+                return Err(crate::error::EDSLError::Validation {
+                    message: format!(
+                        "Invalid layout '{}', must be one of: {}",
+                        layout,
+                        VALID_LAYOUTS.join(", ")
+                    ),
+                });
+            }
+        }
+
+        // Validate font
+        if let Some(ref font) = self.font {
+            if !VALID_FONTS.contains(&font.as_str()) {
+                return Err(crate::error::EDSLError::Validation {
+                    message: format!(
+                        "Invalid font '{}', must be one of: {}",
+                        font,
+                        VALID_FONTS.join(", ")
+                    ),
+                });
+            }
+        }
+
+        // Validate sketchiness range
+        if let Some(sketchiness) = self.sketchiness {
+            if sketchiness > MAX_SKETCHINESS {
+                return Err(crate::error::EDSLError::Validation {
+                    message: format!(
+                        "Sketchiness must be between 0-{MAX_SKETCHINESS}, got {sketchiness}"
+                    ),
+                });
+            }
+        }
+
+        // Validate stroke width
+        if let Some(width) = self.stroke_width {
+            if !(MIN_STROKE_WIDTH..=MAX_STROKE_WIDTH).contains(&width) {
+                return Err(crate::error::EDSLError::Validation {
+                    message: format!(
+                        "Stroke width must be between {MIN_STROKE_WIDTH}-{MAX_STROKE_WIDTH}, got {width}"
+                    ),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Builder for creating GlobalConfig instances
+#[derive(Debug, Default)]
+pub struct GlobalConfigBuilder {
+    theme: Option<String>,
+    layout: Option<String>,
+    font: Option<String>,
+    sketchiness: Option<u8>,
+    stroke_width: Option<f64>,
+    background_color: Option<String>,
+}
+
+impl GlobalConfigBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn theme<S: Into<String>>(mut self, theme: S) -> Self {
+        self.theme = Some(theme.into());
+        self
+    }
+
+    pub fn layout<S: Into<String>>(mut self, layout: S) -> Self {
+        self.layout = Some(layout.into());
+        self
+    }
+
+    pub fn font<S: Into<String>>(mut self, font: S) -> Self {
+        self.font = Some(font.into());
+        self
+    }
+
+    pub fn sketchiness(mut self, sketchiness: u8) -> crate::error::Result<Self> {
+        if sketchiness > MAX_SKETCHINESS {
+            return Err(crate::error::EDSLError::Validation {
+                message: format!(
+                    "Sketchiness must be between 0-{MAX_SKETCHINESS}, got {sketchiness}"
+                ),
+            });
+        }
+        self.sketchiness = Some(sketchiness);
+        Ok(self)
+    }
+
+    pub fn stroke_width(mut self, width: f64) -> crate::error::Result<Self> {
+        if !(MIN_STROKE_WIDTH..=MAX_STROKE_WIDTH).contains(&width) {
+            return Err(crate::error::EDSLError::Validation {
+                message: format!(
+                    "Stroke width must be between {MIN_STROKE_WIDTH}-{MAX_STROKE_WIDTH}, got {width}"
+                ),
+            });
+        }
+        self.stroke_width = Some(width);
+        Ok(self)
+    }
+
+    pub fn background_color<S: Into<String>>(mut self, color: S) -> Self {
+        self.background_color = Some(color.into());
+        self
+    }
+
+    pub fn build(self) -> GlobalConfig {
+        GlobalConfig {
+            theme: self.theme,
+            layout: self.layout,
+            font: self.font,
+            sketchiness: self.sketchiness,
+            stroke_width: self.stroke_width,
+            background_color: self.background_color,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +326,56 @@ impl AttributeValue {
         match self {
             AttributeValue::Boolean(b) => Some(*b),
             _ => None,
+        }
+    }
+}
+
+impl TryFrom<AttributeValue> for String {
+    type Error = crate::error::EDSLError;
+
+    fn try_from(value: AttributeValue) -> crate::error::Result<Self> {
+        match value {
+            AttributeValue::String(s) => Ok(s),
+            _ => Err(crate::error::EDSLError::Validation {
+                message: format!("Expected string value, got {value:?}"),
+            }),
+        }
+    }
+}
+
+impl TryFrom<AttributeValue> for f64 {
+    type Error = crate::error::EDSLError;
+
+    fn try_from(value: AttributeValue) -> crate::error::Result<Self> {
+        match value {
+            AttributeValue::Number(n) => Ok(n),
+            _ => Err(crate::error::EDSLError::Validation {
+                message: format!("Expected number value, got {value:?}"),
+            }),
+        }
+    }
+}
+
+impl TryFrom<AttributeValue> for bool {
+    type Error = crate::error::EDSLError;
+
+    fn try_from(value: AttributeValue) -> crate::error::Result<Self> {
+        match value {
+            AttributeValue::Boolean(b) => Ok(b),
+            _ => Err(crate::error::EDSLError::Validation {
+                message: format!("Expected boolean value, got {value:?}"),
+            }),
+        }
+    }
+}
+
+impl fmt::Display for AttributeValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AttributeValue::String(s) => write!(f, "{s}"),
+            AttributeValue::Number(n) => write!(f, "{n}"),
+            AttributeValue::Color(c) => write!(f, "{c}"),
+            AttributeValue::Boolean(b) => write!(f, "{b}"),
         }
     }
 }
