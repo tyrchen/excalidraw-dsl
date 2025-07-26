@@ -110,7 +110,15 @@ impl DagreLayout {
         use petgraph::Direction as PetDirection;
 
         // Perform topological sort to get a rough ordering
-        let topo_order = toposort(&igr.graph, None).map_err(|_| LayoutError::InvalidGraph)?;
+        let topo_order = toposort(&igr.graph, None).map_err(|cycle| {
+            // Extract the node involved in the cycle
+            let node_in_cycle = &igr.graph[cycle.node_id()];
+            LayoutError::CalculationFailed(format!(
+                "The 'dagre' layout requires a directed acyclic graph (DAG) but found a cycle involving node '{}'. \
+                Consider using 'layout: force' in your configuration instead, which supports cycles.",
+                node_in_cycle.id
+            ))
+        })?;
 
         let mut layers: Vec<Vec<NodeIndex>> = Vec::new();
         let mut node_to_layer: HashMap<NodeIndex, usize> = HashMap::new();
@@ -251,10 +259,10 @@ pub struct ForceLayoutOptions {
 impl Default for ForceLayoutOptions {
     fn default() -> Self {
         Self {
-            iterations: 100,
-            repulsion_strength: 1000.0,
-            attraction_strength: 0.1,
-            damping: 0.9,
+            iterations: 200,
+            repulsion_strength: 5000.0,
+            attraction_strength: 0.05,
+            damping: 0.85,
         }
     }
 }
@@ -300,7 +308,8 @@ impl ForceLayout {
         use std::f64::consts::PI;
 
         let node_count = igr.graph.node_count();
-        let radius = (node_count as f64).sqrt() * 50.0;
+        // Increase radius for better initial spacing
+        let radius = (node_count as f64).sqrt() * 100.0;
 
         for (i, node_idx) in igr.graph.node_indices().enumerate() {
             let angle = 2.0 * PI * i as f64 / node_count as f64;
@@ -331,10 +340,14 @@ impl ForceLayout {
                 let dx = pos_i.0 - pos_j.0;
                 let dy = pos_i.1 - pos_j.1;
                 let distance = (dx * dx + dy * dy).sqrt().max(1.0);
+                
+                // Add minimum distance based on node sizes
+                let min_distance = (igr.graph[node_i].width + igr.graph[node_j].width) / 2.0 + 50.0;
+                let effective_distance = distance.max(min_distance * 0.1); // Prevent division by very small numbers
 
-                let force = self.options.repulsion_strength / (distance * distance);
-                let fx = force * dx / distance;
-                let fy = force * dy / distance;
+                let force = self.options.repulsion_strength / (effective_distance * effective_distance);
+                let fx = force * dx / effective_distance;
+                let fy = force * dy / effective_distance;
 
                 let vel_i = velocities.get_mut(&node_i).unwrap();
                 vel_i.0 += fx;

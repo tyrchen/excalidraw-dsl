@@ -1,9 +1,9 @@
 ---
-layout: force
+layout: dagre
 ---
 
-# Basic Flow Chart Example
-# This example demonstrates the key features of EDSL
+# Basic Flow Chart Example (DAG version)
+# This example demonstrates the key features of EDSL without cycles
 
 # Define nodes with labels and optional styles
 start[Start] {
@@ -36,10 +36,9 @@ success[Show Success] {
   backgroundColor: "#dcfce7";
 }
 
-# Define the flow with edge labels
+# Define the flow with edge labels (no cycle)
 start -> input
 input -> validate
-validate -> process{Valid}
-validate -> error{Invalid}
-error -> input
+validate -> process: Valid
+validate -> error: Invalid
 process -> success
