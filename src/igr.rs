@@ -51,7 +51,7 @@ pub struct GroupData {
     pub bounds: Option<BoundingBox>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExcalidrawAttributes {
     // Shape properties
     pub shape: Option<String>,
@@ -87,25 +87,9 @@ pub struct BoundingBox {
     pub height: f64,
 }
 
-impl Default for ExcalidrawAttributes {
+impl Default for IntermediateGraph {
     fn default() -> Self {
-        Self {
-            shape: None,
-            width: None,
-            height: None,
-            stroke_color: None,
-            stroke_width: None,
-            stroke_style: None,
-            background_color: None,
-            fill_style: None,
-            fill_weight: None,
-            roughness: None,
-            font: None,
-            font_size: None,
-            rounded: None,
-            start_arrowhead: None,
-            end_arrowhead: None,
-        }
+        Self::new()
     }
 }
 
@@ -233,9 +217,12 @@ impl IntermediateGraph {
 }
 
 impl NodeData {
-    pub fn from_definition(def: NodeDefinition, component_types: &HashMap<String, ComponentTypeDefinition>) -> Result<Self> {
+    pub fn from_definition(
+        def: NodeDefinition,
+        component_types: &HashMap<String, ComponentTypeDefinition>,
+    ) -> Result<Self> {
         let mut attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
-        
+
         // Apply component type styling if specified
         if let Some(type_name) = &def.component_type {
             if let Some(comp_type) = component_types.get(type_name) {
@@ -243,7 +230,7 @@ impl NodeData {
                 if let Some(shape) = &comp_type.shape {
                     attributes.shape = Some(shape.clone());
                 }
-                
+
                 // Apply style from component type (with node-specific overrides)
                 if comp_type.style.fill.is_some() && attributes.background_color.is_none() {
                     attributes.background_color = comp_type.style.fill.clone();
@@ -255,7 +242,7 @@ impl NodeData {
                     attributes.stroke_width = comp_type.style.stroke_width;
                 }
                 if comp_type.style.stroke_style.is_some() && attributes.stroke_style.is_none() {
-                    attributes.stroke_style = comp_type.style.stroke_style.clone();
+                    attributes.stroke_style = comp_type.style.stroke_style;
                 }
                 if comp_type.style.fill_style.is_some() && attributes.fill_style.is_none() {
                     attributes.fill_style = comp_type.style.fill_style.clone();
@@ -276,7 +263,7 @@ impl NodeData {
                 return Err(BuildError::UnknownComponentType(type_name.clone()).into());
             }
         }
-        
+
         let label = def.label.unwrap_or_else(|| def.id.clone());
 
         // Estimate initial dimensions based on label with better text metrics
@@ -288,46 +275,49 @@ impl NodeData {
             None => 3, // Default to Cascadia
             _ => 3,
         };
-        
+
         // Calculate text dimensions using improved logic for better accuracy
         let char_width_multiplier = match font_family {
-            1 => 0.65,  // Virgil - slightly wider
-            2 => 0.55,  // Helvetica - slightly wider  
-            3 => 0.6,   // Cascadia - wider for better readability
+            1 => 0.65, // Virgil - slightly wider
+            2 => 0.55, // Helvetica - slightly wider
+            3 => 0.6,  // Cascadia - wider for better readability
             _ => 0.6,
         };
-        
+
         // Improved character width calculation with better handling for common characters
-        let effective_length = label.chars().map(|c| {
-            match c {
-                // Narrow characters
-                'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
-                // Wide characters
-                'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
-                // Uppercase letters (generally wider)
-                'A'..='Z' => 1.15,
-                // Space (reduced to save space)
-                ' ' => 0.35,
-                // Numbers and common punctuation
-                '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
-                // Default for most lowercase and other characters
-                _ => 1.0,
-            }
-        }).sum::<f64>();
-        
+        let effective_length = label
+            .chars()
+            .map(|c| {
+                match c {
+                    // Narrow characters
+                    'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
+                    // Wide characters
+                    'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
+                    // Uppercase letters (generally wider)
+                    'A'..='Z' => 1.15,
+                    // Space (reduced to save space)
+                    ' ' => 0.35,
+                    // Numbers and common punctuation
+                    '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
+                    // Default for most lowercase and other characters
+                    _ => 1.0,
+                }
+            })
+            .sum::<f64>();
+
         let text_width = effective_length * font_size * char_width_multiplier;
         let text_height = font_size * 1.3; // Slightly more height for better appearance
-        
+
         // Increased padding for better text visibility and node appearance
         let padding_x = 75.0; // Even more horizontal padding to prevent text overflow
         let padding_y = 25.0; // More vertical padding
-        
+
         let estimated_width = attributes
             .width
             .unwrap_or_else(|| (text_width + padding_x).max(100.0)); // Increased minimum width
         let estimated_height = attributes
             .height
-            .unwrap_or_else(|| (text_height + padding_y).max(70.0));  // Increased minimum height
+            .unwrap_or_else(|| (text_height + padding_y).max(70.0)); // Increased minimum height
 
         Ok(NodeData {
             id: def.id,
@@ -344,7 +334,7 @@ impl NodeData {
 impl EdgeData {
     pub fn from_definition(def: EdgeDefinition) -> Result<Self> {
         let mut attributes = ExcalidrawAttributes::from_hashmap(&def.attributes)?;
-        
+
         // Apply advanced edge styling if present
         if let Some(style) = &def.style {
             // Map edge type to stroke style
@@ -355,7 +345,7 @@ impl EdgeData {
                     _ => attributes.stroke_style = Some(StrokeStyle::Solid),
                 }
             }
-            
+
             // Apply other style properties
             if let Some(color) = &style.color {
                 attributes.stroke_color = Some(color.clone());
@@ -364,36 +354,43 @@ impl EdgeData {
                 attributes.stroke_width = Some(*width);
             }
             if let Some(stroke_style) = &style.stroke_style {
-                attributes.stroke_style = Some(stroke_style.clone());
+                attributes.stroke_style = Some(*stroke_style);
             }
         }
 
         Ok(EdgeData {
-            label: def.label.or(def.style.as_ref().and_then(|s| s.label.clone())),
+            label: def
+                .label
+                .or(def.style.as_ref().and_then(|s| s.label.clone())),
             arrow_type: def.arrow_type,
             attributes,
         })
     }
-    
-    pub fn from_connection(def: ConnectionDefinition, node_map: &HashMap<String, NodeIndex>) -> Result<Vec<(NodeIndex, NodeIndex, EdgeData)>> {
+
+    pub fn from_connection(
+        def: ConnectionDefinition,
+        node_map: &HashMap<String, NodeIndex>,
+    ) -> Result<Vec<(NodeIndex, NodeIndex, EdgeData)>> {
         let mut edges = Vec::new();
-        
+
         // Get the source node index
-        let from_idx = node_map.get(&def.from)
+        let from_idx = node_map
+            .get(&def.from)
             .copied()
             .ok_or_else(|| BuildError::UnknownNode(def.from.clone()))?;
-        
+
         // Create an edge for each target
         for to_id in &def.to {
-            let to_idx = node_map.get(to_id)
+            let to_idx = node_map
+                .get(to_id)
                 .copied()
                 .ok_or_else(|| BuildError::UnknownNode(to_id.clone()))?;
-            
+
             let mut attributes = ExcalidrawAttributes::default();
-            
+
             // Apply connection style
             let style = &def.style;
-            
+
             // Map edge type to arrow type and stroke style
             let arrow_type = if let Some(edge_type) = &style.edge_type {
                 match edge_type {
@@ -404,7 +401,7 @@ impl EdgeData {
             } else {
                 ArrowType::SingleArrow
             };
-            
+
             // Apply stroke style
             if let Some(edge_type) = &style.edge_type {
                 match edge_type {
@@ -413,7 +410,7 @@ impl EdgeData {
                     _ => attributes.stroke_style = Some(StrokeStyle::Solid),
                 }
             }
-            
+
             // Apply other style properties
             if let Some(color) = &style.color {
                 attributes.stroke_color = Some(color.clone());
@@ -422,18 +419,18 @@ impl EdgeData {
                 attributes.stroke_width = Some(*width);
             }
             if let Some(stroke_style) = &style.stroke_style {
-                attributes.stroke_style = Some(stroke_style.clone());
+                attributes.stroke_style = Some(*stroke_style);
             }
-            
+
             let edge_data = EdgeData {
                 label: style.label.clone(),
                 arrow_type,
                 attributes,
             };
-            
+
             edges.push((from_idx, to_idx, edge_data));
         }
-        
+
         Ok(edges)
     }
 }
@@ -492,10 +489,7 @@ impl GroupData {
         }
 
         if children.is_empty() {
-            return Err(BuildError::EmptyContainer(
-                def.id.clone()
-            )
-            .into());
+            return Err(BuildError::EmptyContainer(def.id.clone()).into());
         }
 
         Ok(GroupData {

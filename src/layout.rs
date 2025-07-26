@@ -1,13 +1,13 @@
 // src/layout.rs
+use crate::ast::GroupType;
 use crate::error::{LayoutError, Result};
 use crate::igr::{BoundingBox, IntermediateGraph};
-use crate::ast::GroupType;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use petgraph::Direction as PetDirection;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use std::sync::Mutex;
 
 pub trait LayoutEngine: Send + Sync {
@@ -25,31 +25,35 @@ struct LayoutCacheKey {
 impl LayoutCacheKey {
     fn from_igr(igr: &IntermediateGraph, engine: &str) -> Self {
         let mut hasher = DefaultHasher::new();
-        
+
         // Hash nodes
-        let mut node_ids: Vec<_> = igr.graph.node_indices()
+        let mut node_ids: Vec<_> = igr
+            .graph
+            .node_indices()
             .map(|idx| &igr.graph[idx].id)
             .collect();
         node_ids.sort();
-        
+
         for id in &node_ids {
             id.hash(&mut hasher);
         }
-        
+
         // Hash edges
-        let mut edge_pairs: Vec<_> = igr.graph.edge_indices()
+        let mut edge_pairs: Vec<_> = igr
+            .graph
+            .edge_indices()
             .map(|idx| {
                 let (source, target) = igr.graph.edge_endpoints(idx).unwrap();
                 (&igr.graph[source].id, &igr.graph[target].id)
             })
             .collect();
         edge_pairs.sort();
-        
+
         for (source, target) in &edge_pairs {
             source.hash(&mut hasher);
             target.hash(&mut hasher);
         }
-        
+
         Self {
             graph_hash: hasher.finish(),
             engine: engine.to_string(),
@@ -69,6 +73,12 @@ pub struct LayoutManager {
     cache_enabled: bool,
 }
 
+impl Default for LayoutManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LayoutManager {
     pub fn new() -> Self {
         let mut manager = LayoutManager {
@@ -83,11 +93,11 @@ impl LayoutManager {
 
         manager
     }
-    
+
     pub fn enable_cache(&mut self, enabled: bool) {
         self.cache_enabled = enabled;
     }
-    
+
     pub fn clear_cache(&self) {
         if let Ok(mut cache) = self.cache.lock() {
             cache.clear();
@@ -109,18 +119,22 @@ impl LayoutManager {
         // Check cache if enabled
         if self.cache_enabled {
             let cache_key = LayoutCacheKey::from_igr(igr, layout_name);
-            
+
             // Try to get from cache
             if let Ok(cache) = self.cache.lock() {
                 if let Some(cached_layout) = cache.get(&cache_key) {
                     // Apply cached positions
-                    let updates: Vec<_> = igr.graph.node_references()
+                    let updates: Vec<_> = igr
+                        .graph
+                        .node_references()
                         .filter_map(|(node_idx, node_data)| {
-                            cached_layout.positions.get(&node_data.id)
+                            cached_layout
+                                .positions
+                                .get(&node_data.id)
                                 .map(|&(x, y)| (node_idx, x, y))
                         })
                         .collect();
-                    
+
                     // Apply updates after collecting
                     for (node_idx, x, y) in updates {
                         igr.graph[node_idx].x = x;
@@ -129,17 +143,17 @@ impl LayoutManager {
                     return Ok(());
                 }
             }
-            
+
             // Not in cache, compute layout
             engine.layout(igr)?;
-            
+
             // Store in cache
             if let Ok(mut cache) = self.cache.lock() {
                 let mut positions = HashMap::new();
                 for (_, node_data) in igr.graph.node_references() {
                     positions.insert(node_data.id.clone(), (node_data.x, node_data.y));
                 }
-                
+
                 // Simple LRU: remove oldest if cache is too large
                 if cache.len() > 100 {
                     // Remove a random entry (simple eviction)
@@ -147,10 +161,10 @@ impl LayoutManager {
                         cache.remove(&key);
                     }
                 }
-                
+
                 cache.insert(cache_key, CachedLayout { positions });
             }
-            
+
             Ok(())
         } else {
             engine.layout(igr)
@@ -190,12 +204,18 @@ pub enum RankingAlgorithm {
 impl Default for DagreLayoutOptions {
     fn default() -> Self {
         Self {
-            node_sep: 80.0,  // Increased separation between nodes in same layer
-            rank_sep: 150.0, // Increased separation between layers
-            edge_sep: 20.0,  // Separation between edges
+            node_sep: 80.0,                  // Increased separation between nodes in same layer
+            rank_sep: 150.0,                 // Increased separation between layers
+            edge_sep: 20.0,                  // Separation between edges
             direction: Direction::LeftRight, // Changed default to left-right
             ranker: RankingAlgorithm::LongestPath,
         }
+    }
+}
+
+impl Default for DagreLayout {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -257,14 +277,14 @@ impl DagreLayout {
         }
 
         // Layout each group independently
-        for (_group_idx, group) in igr.groups.iter().enumerate() {
+        for group in igr.groups.iter() {
             if group.children.is_empty() {
                 continue;
             }
 
             // Create a subgraph for this group
             let positions = self.layout_group_subgraph(igr, &group.children, &group.group_type)?;
-            
+
             // Apply positions from subgraph layout
             for (&node_idx, &(x, y)) in &positions {
                 let node = &mut igr.graph[node_idx];
@@ -274,7 +294,9 @@ impl DagreLayout {
         }
 
         // Layout ungrouped nodes
-        let ungrouped_nodes: Vec<NodeIndex> = igr.graph.node_indices()
+        let ungrouped_nodes: Vec<NodeIndex> = igr
+            .graph
+            .node_indices()
             .filter(|idx| !node_to_group.contains_key(idx))
             .collect();
 
@@ -295,13 +317,13 @@ impl DagreLayout {
         group_type: &GroupType,
     ) -> Result<HashMap<NodeIndex, (f64, f64)>> {
         let mut positions = HashMap::new();
-        
+
         match group_type {
             GroupType::FlowGroup => {
                 // Linear flow layout for flow groups
                 let mut x = 0.0;
                 let y = 0.0;
-                
+
                 for &node_idx in group_nodes {
                     let node = &igr.graph[node_idx];
                     positions.insert(node_idx, (x, y));
@@ -313,7 +335,7 @@ impl DagreLayout {
                 // Create internal edges only
                 let node_set: HashSet<NodeIndex> = group_nodes.iter().copied().collect();
                 let mut internal_edges = Vec::new();
-                
+
                 for &node_idx in group_nodes {
                     for edge in igr.graph.edges_directed(node_idx, PetDirection::Outgoing) {
                         if node_set.contains(&edge.target()) {
@@ -321,7 +343,7 @@ impl DagreLayout {
                         }
                     }
                 }
-                
+
                 // Simple grid layout if no internal structure
                 if internal_edges.is_empty() {
                     let cols = (group_nodes.len() as f64).sqrt().ceil() as usize;
@@ -329,7 +351,7 @@ impl DagreLayout {
                         let row = i / cols;
                         let col = i % cols;
                         let node = &igr.graph[node_idx];
-                        
+
                         let x = col as f64 * (node.width + self.options.node_sep);
                         let y = row as f64 * (node.height + self.options.rank_sep);
                         positions.insert(node_idx, (x, y));
@@ -340,12 +362,13 @@ impl DagreLayout {
                     // the dagre algorithm on just this subgraph
                     let mut x = 0.0;
                     let mut y = 0.0;
-                    
+
                     for &node_idx in group_nodes {
                         let node = &igr.graph[node_idx];
                         positions.insert(node_idx, (x, y));
                         x += node.width + self.options.node_sep;
-                        if x > 400.0 { // Wrap after certain width
+                        if x > 400.0 {
+                            // Wrap after certain width
                             x = 0.0;
                             y += node.height + self.options.rank_sep;
                         }
@@ -353,39 +376,43 @@ impl DagreLayout {
                 }
             }
         }
-        
+
         Ok(positions)
     }
 
-    fn layout_ungrouped_nodes(&self, igr: &mut IntermediateGraph, ungrouped_nodes: &[NodeIndex]) -> Result<()> {
+    fn layout_ungrouped_nodes(
+        &self,
+        igr: &mut IntermediateGraph,
+        ungrouped_nodes: &[NodeIndex],
+    ) -> Result<()> {
         // Simple vertical layout for ungrouped nodes
         // In a full implementation, this would consider connections to groups
         let mut y = 0.0;
-        
+
         for &node_idx in ungrouped_nodes {
             let node = &mut igr.graph[node_idx];
             node.x = -200.0; // Place to the left of groups
             node.y = y;
             y += node.height + self.options.node_sep;
         }
-        
+
         Ok(())
     }
 
     fn adjust_group_positions(&self, igr: &mut IntermediateGraph) {
         // Calculate bounds for each group
         let mut group_bounds = Vec::new();
-        
+
         for group in &igr.groups {
             if group.children.is_empty() {
                 continue;
             }
-            
+
             let mut min_x = f64::INFINITY;
             let mut min_y = f64::INFINITY;
             let mut max_x = f64::NEG_INFINITY;
             let mut max_y = f64::NEG_INFINITY;
-            
+
             for &child_idx in &group.children {
                 let node = &igr.graph[child_idx];
                 min_x = min_x.min(node.x - node.width / 2.0);
@@ -393,23 +420,23 @@ impl DagreLayout {
                 min_y = min_y.min(node.y - node.height / 2.0);
                 max_y = max_y.max(node.y + node.height / 2.0);
             }
-            
+
             group_bounds.push((min_x, min_y, max_x, max_y));
         }
-        
+
         // Arrange groups to prevent overlap
         let group_padding = 100.0;
         let mut x_offset = 0.0;
-        
+
         for (group_idx, (min_x, _min_y, max_x, _max_y)) in group_bounds.iter().enumerate() {
             let width = max_x - min_x;
             let dx = x_offset - min_x;
-            
+
             // Move all nodes in this group
             for &child_idx in &igr.groups[group_idx].children {
                 igr.graph[child_idx].x += dx;
             }
-            
+
             x_offset += width + group_padding;
         }
     }
@@ -444,7 +471,7 @@ impl DagreLayout {
                 GroupType::BasicGroup => 25.0,
                 GroupType::SemanticGroup(_) => 35.0,
             };
-            
+
             group.bounds = Some(BoundingBox {
                 x: min_x - padding,
                 y: min_y - padding,
@@ -457,7 +484,7 @@ impl DagreLayout {
     // Improved ranking algorithm based on layout-rust's longest path
     fn assign_ranks(&self, igr: &IntermediateGraph) -> Result<HashMap<NodeIndex, i32>> {
         use petgraph::algo::toposort;
-        
+
         // First check for cycles
         let _ = toposort(&igr.graph, None).map_err(|cycle| {
             let node_in_cycle = &igr.graph[cycle.node_id()];
@@ -487,9 +514,14 @@ impl DagreLayout {
         let mut visited = HashMap::new();
 
         // Find all source nodes (nodes with no incoming edges)
-        let sources: Vec<NodeIndex> = igr.graph.node_indices()
+        let sources: Vec<NodeIndex> = igr
+            .graph
+            .node_indices()
             .filter(|&node| {
-                igr.graph.edges_directed(node, PetDirection::Incoming).count() == 0
+                igr.graph
+                    .edges_directed(node, PetDirection::Incoming)
+                    .count()
+                    == 0
             })
             .collect();
 
@@ -518,11 +550,12 @@ impl DagreLayout {
         if visited.contains_key(&node) {
             return ranks.get(&node).copied().unwrap_or(0);
         }
-        
+
         visited.insert(node, true);
 
         // Get ranks of all successors
-        let successor_ranks: Vec<i32> = igr.graph
+        let successor_ranks: Vec<i32> = igr
+            .graph
             .edges_directed(node, PetDirection::Outgoing)
             .map(|edge| {
                 let target = edge.target();
@@ -535,12 +568,16 @@ impl DagreLayout {
         // The rank is the minimum of successor ranks
         let rank = successor_ranks.into_iter().min().unwrap_or(0);
         ranks.insert(node, rank);
-        
+
         rank
     }
 
     // Build layers from ranks
-    fn build_layers(&self, _igr: &IntermediateGraph, node_ranks: &HashMap<NodeIndex, i32>) -> Vec<Vec<NodeIndex>> {
+    fn build_layers(
+        &self,
+        _igr: &IntermediateGraph,
+        node_ranks: &HashMap<NodeIndex, i32>,
+    ) -> Vec<Vec<NodeIndex>> {
         let mut layers_map: HashMap<i32, Vec<NodeIndex>> = HashMap::new();
 
         // Group nodes by rank
@@ -552,13 +589,18 @@ impl DagreLayout {
         let mut sorted_ranks: Vec<i32> = layers_map.keys().copied().collect();
         sorted_ranks.sort();
 
-        sorted_ranks.into_iter()
+        sorted_ranks
+            .into_iter()
             .map(|rank| layers_map.remove(&rank).unwrap())
             .collect()
     }
 
     // Crossing minimization using barycenter method inspired by layout-rust
-    fn minimize_crossings(&self, igr: &IntermediateGraph, mut layers: Vec<Vec<NodeIndex>>) -> Vec<Vec<NodeIndex>> {
+    fn minimize_crossings(
+        &self,
+        igr: &IntermediateGraph,
+        mut layers: Vec<Vec<NodeIndex>>,
+    ) -> Vec<Vec<NodeIndex>> {
         // Multiple passes to improve crossing reduction
         for _ in 0..4 {
             // Forward pass (top to bottom)
@@ -568,7 +610,7 @@ impl DagreLayout {
                 let current_layer = &mut curr_part[0];
                 self.sort_layer_by_barycenter(igr, current_layer, prev_layer, true);
             }
-            
+
             // Backward pass (bottom to top)
             for i in (0..layers.len() - 1).rev() {
                 let (curr_part, next_part) = layers.split_at_mut(i + 1);
@@ -577,10 +619,10 @@ impl DagreLayout {
                 self.sort_layer_by_barycenter(igr, current_layer, next_layer, false);
             }
         }
-        
+
         layers
     }
-    
+
     // Sort nodes in a layer based on barycenter of connected nodes
     fn sort_layer_by_barycenter(
         &self,
@@ -595,7 +637,7 @@ impl DagreLayout {
             .enumerate()
             .map(|(i, &node)| (node, i))
             .collect();
-        
+
         // Calculate barycenter for each node
         let barycenters: Vec<(NodeIndex, Option<f64>)> = layer
             .iter()
@@ -607,39 +649,41 @@ impl DagreLayout {
                     // Look at outgoing edges to next layer
                     igr.graph.edges_directed(node, PetDirection::Outgoing)
                 };
-                
+
                 let mut sum = 0.0;
                 let mut count = 0;
-                
+
                 for edge in edges {
-                    let other_node = if forward { edge.source() } else { edge.target() };
+                    let other_node = if forward {
+                        edge.source()
+                    } else {
+                        edge.target()
+                    };
                     if let Some(&pos) = positions.get(&other_node) {
                         sum += pos as f64;
                         count += 1;
                     }
                 }
-                
+
                 let barycenter = if count > 0 {
                     Some(sum / count as f64)
                 } else {
                     None
                 };
-                
+
                 (node, barycenter)
             })
             .collect();
-        
+
         // Sort by barycenter (nodes without connections stay in place)
         let mut sorted_indices: Vec<usize> = (0..layer.len()).collect();
-        sorted_indices.sort_by(|&a, &b| {
-            match (barycenters[a].1, barycenters[b].1) {
-                (Some(bc_a), Some(bc_b)) => bc_a.partial_cmp(&bc_b).unwrap(),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => a.cmp(&b),
-            }
+        sorted_indices.sort_by(|&a, &b| match (barycenters[a].1, barycenters[b].1) {
+            (Some(bc_a), Some(bc_b)) => bc_a.partial_cmp(&bc_b).unwrap(),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.cmp(&b),
         });
-        
+
         // Apply the new ordering
         let original_layer = layer.clone();
         for (i, &idx) in sorted_indices.iter().enumerate() {
@@ -650,10 +694,10 @@ impl DagreLayout {
     fn position_nodes(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) -> Result<()> {
         // First assign Y positions (or X for horizontal layouts) based on layers
         self.assign_layer_positions(igr, layers);
-        
+
         // Then assign X positions (or Y for horizontal) within each layer
         self.assign_node_positions_within_layers(igr, layers);
-        
+
         Ok(())
     }
 
@@ -670,16 +714,14 @@ impl DagreLayout {
 
             // Find maximum dimension in this layer
             let max_dimension = match self.options.direction {
-                Direction::LeftRight | Direction::RightLeft => {
-                    layer.iter()
-                        .map(|&idx| igr.graph[idx].width)
-                        .fold(0.0, f64::max)
-                }
-                Direction::TopBottom | Direction::BottomTop => {
-                    layer.iter()
-                        .map(|&idx| igr.graph[idx].height)
-                        .fold(0.0, f64::max)
-                }
+                Direction::LeftRight | Direction::RightLeft => layer
+                    .iter()
+                    .map(|&idx| igr.graph[idx].width)
+                    .fold(0.0, f64::max),
+                Direction::TopBottom | Direction::BottomTop => layer
+                    .iter()
+                    .map(|&idx| igr.graph[idx].height)
+                    .fold(0.0, f64::max),
             };
 
             layer_positions.push(current_pos + max_dimension / 2.0);
@@ -691,9 +733,9 @@ impl DagreLayout {
             if layer_idx >= layer_positions.len() {
                 continue;
             }
-            
+
             let pos = layer_positions[layer_idx];
-            
+
             for &node_idx in layer {
                 let node = &mut igr.graph[node_idx];
                 match self.options.direction {
@@ -707,20 +749,25 @@ impl DagreLayout {
     }
 
     // Assign positions within each layer
-    fn assign_node_positions_within_layers(&self, igr: &mut IntermediateGraph, layers: &[Vec<NodeIndex>]) {
+    fn assign_node_positions_within_layers(
+        &self,
+        igr: &mut IntermediateGraph,
+        layers: &[Vec<NodeIndex>],
+    ) {
         // Track which paths nodes belong to for better separation
         let mut path_groups: HashMap<NodeIndex, usize> = HashMap::new();
         let mut next_path_id = 0;
-        
+
         // Assign path IDs based on connectivity
-        for (_layer_idx, layer) in layers.iter().enumerate() {
+        for layer in layers.iter() {
             for &node_idx in layer {
                 // Check if this node has an assigned path from a parent
-                let incoming_paths: HashSet<usize> = igr.graph
+                let incoming_paths: HashSet<usize> = igr
+                    .graph
                     .edges_directed(node_idx, PetDirection::Incoming)
                     .filter_map(|edge| path_groups.get(&edge.source()).copied())
                     .collect();
-                
+
                 let path_id = if incoming_paths.is_empty() {
                     // New path starting from this node
                     let id = next_path_id;
@@ -733,38 +780,41 @@ impl DagreLayout {
                     // Multiple paths converging - take the smallest path ID
                     *incoming_paths.iter().min().unwrap()
                 };
-                
+
                 path_groups.insert(node_idx, path_id);
             }
         }
-        
-        for (_layer_idx, layer) in layers.iter().enumerate() {
+
+        for layer in layers.iter() {
             if layer.is_empty() {
                 continue;
             }
 
             // Group nodes by their path
             let mut nodes_by_path: HashMap<usize, Vec<(NodeIndex, f64)>> = HashMap::new();
-            
+
             for &node_idx in layer {
                 let node = &igr.graph[node_idx];
                 let size = match self.options.direction {
                     Direction::LeftRight | Direction::RightLeft => node.height,
                     Direction::TopBottom | Direction::BottomTop => node.width,
                 };
-                
+
                 let path_id = path_groups.get(&node_idx).copied().unwrap_or(0);
-                nodes_by_path.entry(path_id).or_default().push((node_idx, size));
+                nodes_by_path
+                    .entry(path_id)
+                    .or_default()
+                    .push((node_idx, size));
             }
-            
+
             // Sort paths by ID for consistent ordering
             let mut paths: Vec<_> = nodes_by_path.into_iter().collect();
             paths.sort_by_key(|(path_id, _)| *path_id);
-            
+
             // Calculate total size needed for this layer with extra spacing between paths
             let path_separation = self.options.node_sep * 2.0; // Extra space between different paths
             let mut total_size = 0.0;
-            
+
             for (_, nodes) in &paths {
                 total_size += nodes.iter().map(|(_, size)| size).sum::<f64>();
                 total_size += (nodes.len().saturating_sub(1)) as f64 * self.options.node_sep;
@@ -779,15 +829,15 @@ impl DagreLayout {
                 if path_idx > 0 {
                     current_pos += path_separation;
                 }
-                
+
                 // Position nodes within this path
                 for (i, &(node_idx, size)) in nodes.iter().enumerate() {
                     if i > 0 {
                         current_pos += self.options.node_sep;
                     }
-                    
+
                     let node = &mut igr.graph[node_idx];
-                    
+
                     match self.options.direction {
                         Direction::LeftRight | Direction::RightLeft => {
                             node.y = current_pos + size / 2.0;
@@ -860,6 +910,12 @@ impl Default for ForceLayoutOptions {
             attraction_strength: 0.05,
             damping: 0.85,
         }
+    }
+}
+
+impl Default for ForceLayout {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -936,12 +992,13 @@ impl ForceLayout {
                 let dx = pos_i.0 - pos_j.0;
                 let dy = pos_i.1 - pos_j.1;
                 let distance = (dx * dx + dy * dy).sqrt().max(1.0);
-                
+
                 // Add minimum distance based on node sizes
                 let min_distance = (igr.graph[node_i].width + igr.graph[node_j].width) / 2.0 + 50.0;
                 let effective_distance = distance.max(min_distance * 0.1); // Prevent division by very small numbers
 
-                let force = self.options.repulsion_strength / (effective_distance * effective_distance);
+                let force =
+                    self.options.repulsion_strength / (effective_distance * effective_distance);
                 let fx = force * dx / effective_distance;
                 let fy = force * dy / effective_distance;
 

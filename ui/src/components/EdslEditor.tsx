@@ -181,12 +181,37 @@ export const EdslEditor: React.FC<EdslEditorProps> = ({ height = '100%' }) => {
     }
   };
 
-  // Initial validation
+  // Sync editor content when currentFile changes
+  useEffect(() => {
+    if (currentFile && editorRef.current) {
+      // Clear previous validation errors when switching files
+      setValidationResult(null);
+      
+      // Force update the editor value when a new file is selected
+      const currentEditorValue = editorRef.current.getValue();
+      if (currentEditorValue !== currentFile.content) {
+        editorRef.current.setValue(currentFile.content);
+        
+        // Trigger validation and compilation manually since setValue doesn't trigger onChange
+        debouncedValidate(currentFile.content);
+        debouncedCompile(currentFile.content);
+      }
+    }
+  }, [currentFile, setValidationResult, debouncedValidate, debouncedCompile]);
+
+  // Trigger validation when content changes
   useEffect(() => {
     if (editorContent && compilerOptions.validate) {
       debouncedValidate(editorContent);
     }
-  }, []);
+  }, [editorContent, compilerOptions.validate, debouncedValidate]);
+
+  // Trigger compilation when content changes
+  useEffect(() => {
+    if (editorContent) {
+      debouncedCompile(editorContent);
+    }
+  }, [editorContent, debouncedCompile]);
 
   return (
     <div className="flex flex-col h-full">

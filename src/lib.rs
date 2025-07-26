@@ -64,7 +64,7 @@ impl EDSLCompiler {
         let file = ExcalidrawGenerator::generate_file(&igr)?;
 
         // Serialize to JSON
-        serde_json::to_string_pretty(&file).map_err(|e| EDSLError::Json(e))
+        serde_json::to_string_pretty(&file).map_err(EDSLError::Json)
     }
 
     /// Compile EDSL source code and return raw elements (without JSON serialization)
@@ -95,10 +95,9 @@ impl EDSLCompiler {
     /// Validate Excalidraw JSON file format
     pub fn validate_excalidraw(&self, json_content: &str) -> Result<()> {
         use serde_json::Value;
-        
-        let value: Value = serde_json::from_str(json_content)
-            .map_err(|e| EDSLError::Json(e))?;
-        
+
+        let value: Value = serde_json::from_str(json_content).map_err(EDSLError::Json)?;
+
         // Check if it's an object (native Excalidraw format)
         match &value {
             Value::Object(map) => {
@@ -110,50 +109,74 @@ impl EDSLCompiler {
                             Self::validate_excalidraw_element(element, i)?;
                         }
                     } else {
-                        return Err(EDSLError::Validation("Missing 'elements' array in Excalidraw format".into()));
+                        return Err(EDSLError::Validation(
+                            "Missing 'elements' array in Excalidraw format".into(),
+                        ));
                     }
                 } else {
-                    return Err(EDSLError::Validation("Invalid Excalidraw format: missing or incorrect 'type' field".into()));
+                    return Err(EDSLError::Validation(
+                        "Invalid Excalidraw format: missing or incorrect 'type' field".into(),
+                    ));
                 }
             }
             _ => {
-                return Err(EDSLError::Validation("Invalid Excalidraw format: expected object with type 'excalidraw'".into()));
+                return Err(EDSLError::Validation(
+                    "Invalid Excalidraw format: expected object with type 'excalidraw'".into(),
+                ));
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn validate_excalidraw_element(element: &serde_json::Value, index: usize) -> Result<()> {
-        let obj = element.as_object()
-            .ok_or_else(|| EDSLError::Validation(format!("Element {} is not an object", index)))?;
-        
+        let obj = element
+            .as_object()
+            .ok_or_else(|| EDSLError::Validation(format!("Element {index} is not an object")))?;
+
         // Required fields
         let required_fields = ["type", "id", "x", "y"];
         for field in &required_fields {
             if !obj.contains_key(*field) {
-                return Err(EDSLError::Validation(format!("Element {} missing required field '{}'", index, field)));
+                return Err(EDSLError::Validation(format!(
+                    "Element {index} missing required field '{field}'"
+                )));
             }
         }
-        
+
         // Validate element type
         if let Some(type_val) = obj.get("type").and_then(|v| v.as_str()) {
             match type_val {
-                "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "text" => {},
-                _ => return Err(EDSLError::Validation(format!("Element {} has invalid type '{}'", index, type_val))),
-            }
-        }
-        
-        // Validate numeric fields
-        let numeric_fields = ["x", "y", "width", "height", "angle", "strokeWidth", "opacity", "fontSize"];
-        for field in &numeric_fields {
-            if let Some(val) = obj.get(*field) {
-                if !val.is_number() {
-                    return Err(EDSLError::Validation(format!("Element {} field '{}' must be a number", index, field)));
+                "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "text" => {}
+                _ => {
+                    return Err(EDSLError::Validation(format!(
+                        "Element {index} has invalid type '{type_val}'"
+                    )))
                 }
             }
         }
-        
+
+        // Validate numeric fields
+        let numeric_fields = [
+            "x",
+            "y",
+            "width",
+            "height",
+            "angle",
+            "strokeWidth",
+            "opacity",
+            "fontSize",
+        ];
+        for field in &numeric_fields {
+            if let Some(val) = obj.get(*field) {
+                if !val.is_number() {
+                    return Err(EDSLError::Validation(format!(
+                        "Element {index} field '{field}' must be a number"
+                    )));
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -204,7 +227,7 @@ user -> api -> db
         let result = compiler.compile(edsl);
 
         if let Err(e) = &result {
-            eprintln!("Compilation error: {:?}", e);
+            eprintln!("Compilation error: {e:?}");
         }
         assert!(result.is_ok());
         let json = result.unwrap();

@@ -1,7 +1,7 @@
 // src/generator.rs
-use crate::ast::{ArrowType, ArrowheadType, FillStyle, StrokeStyle, GroupType};
+use crate::ast::{ArrowType, ArrowheadType, FillStyle, GroupType, StrokeStyle};
 use crate::error::{GeneratorError, Result};
-use crate::igr::{ContainerData, EdgeData, IntermediateGraph, NodeData, GroupData};
+use crate::igr::{ContainerData, EdgeData, GroupData, IntermediateGraph, NodeData};
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -129,7 +129,7 @@ impl ExcalidrawGenerator {
         for group in &igr.groups {
             if let Some(mut group_element) = Self::generate_group(group)? {
                 let group_id = group_element.id.clone();
-                
+
                 // Generate text element for group if it has a label
                 if let Some(label) = &group.label {
                     if !label.is_empty() {
@@ -142,13 +142,13 @@ impl ExcalidrawGenerator {
                                 group.attributes.font_size.unwrap_or(16.0),
                                 &group.attributes.font,
                             )?;
-                            
+
                             // Add reference to text element in the group's boundElements
                             group_element.bound_elements.push(serde_json::json!({
                                 "id": text_element.id.clone(),
                                 "type": "text"
                             }));
-                            
+
                             elements.push(group_element);
                             elements.push(text_element);
                         } else {
@@ -167,7 +167,7 @@ impl ExcalidrawGenerator {
         for container in &igr.containers {
             if let Some(mut container_element) = Self::generate_container(container)? {
                 let container_id = container_element.id.clone();
-                
+
                 // Generate text element for container if it has a label
                 if let Some(label) = &container.label {
                     if !label.is_empty() {
@@ -180,13 +180,13 @@ impl ExcalidrawGenerator {
                                 container.attributes.font_size.unwrap_or(16.0),
                                 &container.attributes.font,
                             )?;
-                            
+
                             // Add reference to text element in the container's boundElements
                             container_element.bound_elements.push(serde_json::json!({
                                 "id": text_element.id.clone(),
                                 "type": "text"
                             }));
-                            
+
                             elements.push(container_element);
                             elements.push(text_element);
                         } else {
@@ -206,14 +206,14 @@ impl ExcalidrawGenerator {
             let element_id = format!("node_{}", Uuid::new_v4());
             let mut element = Self::generate_node(node_data, &element_id)?;
             node_id_map.insert(node_data.id.clone(), element_id.clone());
-            
+
             // Remove text from shape element (it will be a separate element)
             let label = element.text.take();
-            
+
             // Track the actual index where this node element is pushed
             let node_index = elements.len();
             node_element_indices.insert(element_id.clone(), node_index);
-            
+
             // Generate separate text element for node label
             if let Some(label) = label {
                 if !label.is_empty() {
@@ -225,13 +225,13 @@ impl ExcalidrawGenerator {
                         node_data.attributes.font_size.unwrap_or(20.0),
                         &node_data.attributes.font,
                     )?;
-                    
+
                     // Add reference to text element in the shape's boundElements
                     element.bound_elements.push(serde_json::json!({
                         "id": text_element.id.clone(),
                         "type": "text"
                     }));
-                    
+
                     elements.push(element);
                     elements.push(text_element);
                 } else {
@@ -268,25 +268,29 @@ impl ExcalidrawGenerator {
                 source_element_id,
                 target_element_id,
             )?;
-            
+
             let edge_id = edge_element.id.clone();
-            
+
             // Update source node's boundElements to include this edge
             if let Some(&source_index) = node_element_indices.get(source_element_id) {
-                elements[source_index].bound_elements.push(serde_json::json!({
-                    "id": edge_id.clone(),
-                    "type": "arrow"
-                }));
+                elements[source_index]
+                    .bound_elements
+                    .push(serde_json::json!({
+                        "id": edge_id.clone(),
+                        "type": "arrow"
+                    }));
             }
-            
+
             // Update target node's boundElements to include this edge
             if let Some(&target_index) = node_element_indices.get(target_element_id) {
-                elements[target_index].bound_elements.push(serde_json::json!({
-                    "id": edge_id.clone(),
-                    "type": "arrow"
-                }));
+                elements[target_index]
+                    .bound_elements
+                    .push(serde_json::json!({
+                        "id": edge_id.clone(),
+                        "type": "arrow"
+                    }));
             }
-            
+
             elements.push(edge_element);
         }
 
@@ -490,15 +494,31 @@ impl ExcalidrawGenerator {
         // Different visual styles for different group types
         let (stroke_color, background_color, stroke_style, stroke_width) = match &group.group_type {
             GroupType::FlowGroup => (
-                group.attributes.stroke_color.clone().unwrap_or_else(|| "#3b82f6".to_string()),
-                group.attributes.background_color.clone().unwrap_or_else(|| "#dbeafe".to_string()),
-                group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Dashed),
+                group
+                    .attributes
+                    .stroke_color
+                    .clone()
+                    .unwrap_or_else(|| "#3b82f6".to_string()),
+                group
+                    .attributes
+                    .background_color
+                    .clone()
+                    .unwrap_or_else(|| "#dbeafe".to_string()),
+                group.attributes.stroke_style.unwrap_or(StrokeStyle::Dashed),
                 group.attributes.stroke_width.unwrap_or(2.0),
             ),
             GroupType::BasicGroup => (
-                group.attributes.stroke_color.clone().unwrap_or_else(|| "#6b7280".to_string()),
-                group.attributes.background_color.clone().unwrap_or_else(|| "#f3f4f6".to_string()),
-                group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Solid),
+                group
+                    .attributes
+                    .stroke_color
+                    .clone()
+                    .unwrap_or_else(|| "#6b7280".to_string()),
+                group
+                    .attributes
+                    .background_color
+                    .clone()
+                    .unwrap_or_else(|| "#f3f4f6".to_string()),
+                group.attributes.stroke_style.unwrap_or(StrokeStyle::Solid),
                 group.attributes.stroke_width.unwrap_or(1.0),
             ),
             GroupType::SemanticGroup(group_type) => {
@@ -513,9 +533,17 @@ impl ExcalidrawGenerator {
                     _ => ("#6b7280", "#f3f4f6"),
                 };
                 (
-                    group.attributes.stroke_color.clone().unwrap_or_else(|| default_stroke.to_string()),
-                    group.attributes.background_color.clone().unwrap_or_else(|| default_bg.to_string()),
-                    group.attributes.stroke_style.clone().unwrap_or(StrokeStyle::Solid),
+                    group
+                        .attributes
+                        .stroke_color
+                        .clone()
+                        .unwrap_or_else(|| default_stroke.to_string()),
+                    group
+                        .attributes
+                        .background_color
+                        .clone()
+                        .unwrap_or_else(|| default_bg.to_string()),
+                    group.attributes.stroke_style.unwrap_or(StrokeStyle::Solid),
                     group.attributes.stroke_width.unwrap_or(2.0),
                 )
             }
@@ -536,7 +564,7 @@ impl ExcalidrawGenerator {
             stroke_style: Self::convert_stroke_style(&Some(stroke_style)),
             roughness: group.attributes.roughness.unwrap_or(0),
             opacity: 30, // Semi-transparent background for groups
-            text: None, // Text will be a separate element
+            text: None,  // Text will be a separate element
             font_size: group.attributes.font_size.unwrap_or(18.0).round() as i32,
             font_family: Self::convert_font_family(&group.attributes.font),
             start_binding: None,
@@ -593,7 +621,7 @@ impl ExcalidrawGenerator {
             stroke_style: Self::convert_stroke_style(&container.attributes.stroke_style),
             roughness: container.attributes.roughness.unwrap_or(0),
             opacity: 50, // Semi-transparent background
-            text: None, // Text will be a separate element
+            text: None,  // Text will be a separate element
             font_size: container.attributes.font_size.unwrap_or(16.0).round() as i32,
             font_family: Self::convert_font_family(&container.attributes.font),
             start_binding: None,
@@ -648,41 +676,44 @@ impl ExcalidrawGenerator {
             Some("Helvetica") => 2,
             Some("Cascadia") => 3,
             Some("Code") => 3, // Alias for Cascadia
-            None => 3, // Default to Cascadia (Code font)
-            _ => 3, // Default to Cascadia
+            None => 3,         // Default to Cascadia (Code font)
+            _ => 3,            // Default to Cascadia
         }
     }
 
     fn calculate_text_dimensions(text: &str, font_size: f64, font_family: u8) -> (i32, i32) {
         // Improved text width calculation matching the IGR logic for consistency
         let char_width_multiplier = match font_family {
-            1 => 0.65,  // Virgil - slightly wider
-            2 => 0.55,  // Helvetica - slightly wider  
-            3 => 0.6,   // Cascadia - wider for better readability
+            1 => 0.65, // Virgil - slightly wider
+            2 => 0.55, // Helvetica - slightly wider
+            3 => 0.6,  // Cascadia - wider for better readability
             _ => 0.6,
         };
-        
+
         // Improved character width calculation with better handling for common characters
-        let effective_length = text.chars().map(|c| {
-            match c {
-                // Narrow characters
-                'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
-                // Wide characters
-                'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
-                // Uppercase letters (generally wider)
-                'A'..='Z' => 1.15,
-                // Space (reduced to save space)
-                ' ' => 0.35,
-                // Numbers and common punctuation
-                '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
-                // Default for most lowercase and other characters
-                _ => 1.0,
-            }
-        }).sum::<f64>();
-        
+        let effective_length = text
+            .chars()
+            .map(|c| {
+                match c {
+                    // Narrow characters
+                    'i' | 'l' | '.' | '!' | '|' | '\'' | '`' | 'I' | 'j' | 'f' | 't' => 0.4,
+                    // Wide characters
+                    'w' | 'm' | 'W' | 'M' | '@' | '%' | '#' => 1.4,
+                    // Uppercase letters (generally wider)
+                    'A'..='Z' => 1.15,
+                    // Space (reduced to save space)
+                    ' ' => 0.35,
+                    // Numbers and common punctuation
+                    '0'..='9' | '(' | ')' | '[' | ']' | '{' | '}' | '-' | '_' | '=' | '+' => 0.9,
+                    // Default for most lowercase and other characters
+                    _ => 1.0,
+                }
+            })
+            .sum::<f64>();
+
         let text_width = (effective_length * font_size * char_width_multiplier).round() as i32;
         let text_height = (font_size * 1.3).round() as i32; // Slightly more height for better appearance
-        
+
         (text_width, text_height)
     }
 
@@ -695,12 +726,13 @@ impl ExcalidrawGenerator {
         font: &Option<String>,
     ) -> Result<ExcalidrawElementSkeleton> {
         let font_family = Self::convert_font_family(font);
-        let (text_width, text_height) = Self::calculate_text_dimensions(text, font_size, font_family);
-        
+        let (text_width, text_height) =
+            Self::calculate_text_dimensions(text, font_size, font_family);
+
         // Center the text relative to the given position
         let text_x = (x - text_width as f64 / 2.0).round() as i32;
         let text_y = (y - text_height as f64 / 2.0).round() as i32;
-        
+
         Ok(ExcalidrawElementSkeleton {
             r#type: "text".to_string(),
             id: format!("text_{}", Uuid::new_v4()),
@@ -855,13 +887,13 @@ mod tests {
         };
 
         let mut igr = IntermediateGraph::from_ast(document).unwrap();
-        
+
         // Simulate layout being done
         igr.graph.node_weights_mut().for_each(|node| {
             node.x = 100.0;
             node.y = 100.0;
         });
-        
+
         let elements = ExcalidrawGenerator::generate(&igr).unwrap();
 
         // Should have 2 nodes + 2 text elements + 1 edge = 5 elements

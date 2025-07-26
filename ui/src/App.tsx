@@ -84,7 +84,7 @@ decision -> no[No Path] -> process`,
         {/* Editor and Preview */}
         <div className="flex-1 flex overflow-hidden">
           {/* Editor */}
-          <div className={`${showPreview ? 'w-1/2' : 'w-full'} flex flex-col border-r`}>
+          <div className={`${showPreview ? 'w-2/5' : 'w-full'} flex flex-col border-r`}>
             <div className="h-full bg-white">
               <EdslEditor />
             </div>
@@ -92,7 +92,7 @@ decision -> no[No Path] -> process`,
 
           {/* Preview */}
           {showPreview && (
-            <div className="w-1/2 flex flex-col bg-white">
+            <div className="w-3/5 flex flex-col bg-white">
               <div className="h-12 border-b flex items-center justify-between px-4 bg-gray-50">
                 <h2 className="text-sm font-semibold text-gray-700">Preview</h2>
                 <Button

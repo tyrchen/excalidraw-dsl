@@ -27,28 +27,28 @@ node1 -> node2: Connection
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
-        
+
         // Verify it's valid JSON
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         // Verify basic structure
         assert_eq!(parsed["type"], "excalidraw");
         assert_eq!(parsed["version"], 2);
         assert!(parsed["elements"].is_array());
-        
+
         let elements = parsed["elements"].as_array().unwrap();
         // Should have 2 nodes + 2 text elements + 1 edge = 5 elements
         assert_eq!(elements.len(), 5);
-        
+
         // Check that we have the right element types
         let element_types: Vec<&str> = elements
             .iter()
             .map(|e| e["type"].as_str().unwrap())
             .collect();
-        
+
         assert!(element_types.contains(&"rectangle"));
         assert!(element_types.contains(&"ellipse"));
         assert!(element_types.contains(&"arrow"));
@@ -84,31 +84,25 @@ start -> end: Flow
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         let elements = parsed["elements"].as_array().unwrap();
-        
+
         // Find the rectangle element
-        let rect_element = elements
-            .iter()
-            .find(|e| e["type"] == "rectangle")
-            .unwrap();
-        
+        let rect_element = elements.iter().find(|e| e["type"] == "rectangle").unwrap();
+
         assert_eq!(rect_element["strokeColor"], "#22c55e");
         assert_eq!(rect_element["backgroundColor"], "#dcfce7");
         assert_eq!(rect_element["roughness"], 0);
         assert_eq!(rect_element["fontFamily"], 3); // Cascadia/Code
         assert_eq!(rect_element["fontSize"], 24);
-        
+
         // Find the ellipse element
-        let ellipse_element = elements
-            .iter()
-            .find(|e| e["type"] == "ellipse")
-            .unwrap();
-        
+        let ellipse_element = elements.iter().find(|e| e["type"] == "ellipse").unwrap();
+
         assert_eq!(ellipse_element["strokeColor"], "#ef4444");
         assert_eq!(ellipse_element["backgroundColor"], "#fee2e2");
         assert_eq!(ellipse_element["fillStyle"], "hachure");
@@ -129,19 +123,16 @@ a -> b: Test Label
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         let elements = parsed["elements"].as_array().unwrap();
-        
+
         // Find the arrow element
-        let arrow_element = elements
-            .iter()
-            .find(|e| e["type"] == "arrow")
-            .unwrap();
-        
+        let arrow_element = elements.iter().find(|e| e["type"] == "arrow").unwrap();
+
         assert_eq!(arrow_element["text"], "Test Label");
         assert!(arrow_element["startBinding"].is_object());
         assert!(arrow_element["endBinding"].is_object());
@@ -154,7 +145,7 @@ a -> b: Test Label
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert!(matches!(error, crate::error::EDSLError::Parse(_)));
@@ -174,7 +165,7 @@ node1 -> unknown_node: Connection
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert!(matches!(error, crate::error::EDSLError::Build(_)));
@@ -198,12 +189,12 @@ c -> a  # Creates a cycle
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert!(matches!(error, crate::error::EDSLError::Layout(_)));
-        
-        let error_msg = format!("{}", error);
+
+        let error_msg = format!("{error}");
         assert!(error_msg.contains("cycle"));
         assert!(error_msg.contains("dagre"));
         assert!(error_msg.contains("force"));
@@ -228,16 +219,16 @@ c -> a  # Creates a cycle - should work with force layout
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         let elements = parsed["elements"].as_array().unwrap();
-        
+
         // Should have 3 nodes + 3 text elements + 3 edges = 9 elements
         assert_eq!(elements.len(), 9);
-        
+
         // Verify all elements have valid coordinates
         for element in elements {
             if let Some(x) = element.get("x") {
@@ -280,17 +271,17 @@ test -> test2: Connection
         let compiler = EDSLCompiler::new();
         let input_content = fs::read_to_string(&input_path).unwrap();
         let output_json = compiler.compile(&input_content).unwrap();
-        
+
         // Write output file
         fs::write(&output_path, &output_json).unwrap();
 
         // Verify output file exists and is valid JSON
         let output_content = fs::read_to_string(&output_path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&output_content).unwrap();
-        
+
         assert_eq!(parsed["type"], "excalidraw");
         assert!(parsed["elements"].is_array());
-        
+
         // Clean up
         drop(dir);
     }
@@ -311,27 +302,27 @@ short -> medium -> long
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         let elements = parsed["elements"].as_array().unwrap();
-        
+
         // Find rectangle elements and their widths
         let rectangles: Vec<_> = elements
             .iter()
             .filter(|e| e["type"] == "rectangle")
             .collect();
-        
+
         assert_eq!(rectangles.len(), 3);
-        
+
         // Get widths
         let widths: Vec<i64> = rectangles
             .iter()
             .map(|e| e["width"].as_i64().unwrap())
             .collect();
-        
+
         // Verify that longer text results in wider nodes
         // The exact widths depend on the text measurement algorithm
         assert!(widths[0] < widths[2]); // "Hi" < "This is a very long text..."
@@ -351,10 +342,10 @@ container \"Test Container\" as test_container {
     backgroundColor: \"#f0f0f0\";
     strokeStyle: dashed;
   }
-  
+
   internal1[Internal Node 1]
   internal2[Internal Node 2]
-  
+
   internal1 -> internal2: Internal Connection
 }
 
@@ -364,22 +355,19 @@ external -> internal1: External Connection
 
         let compiler = EDSLCompiler::new();
         let result = compiler.compile(edsl_content);
-        
+
         assert!(result.is_ok());
         let excalidraw_json = result.unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&excalidraw_json).unwrap();
-        
+
         let elements = parsed["elements"].as_array().unwrap();
-        
+
         // Should have container + nodes + text elements + edges
         assert!(elements.len() > 5);
-        
+
         // Verify we have both rectangle elements (for nodes and containers)
-        let rectangles = elements
-            .iter()
-            .filter(|e| e["type"] == "rectangle")
-            .count();
-        
+        let rectangles = elements.iter().filter(|e| e["type"] == "rectangle").count();
+
         assert!(rectangles >= 3); // At least container + 2 internal nodes + 1 external
     }
 }

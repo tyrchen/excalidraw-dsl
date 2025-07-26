@@ -284,7 +284,7 @@ impl LLMClient {
 
         chat_response
             .choices
-            .get(0)
+            .first()
             .map(|choice| choice.message.content.clone())
             .ok_or_else(|| LLMError::InvalidResponse("No response choices".to_string()).into())
     }

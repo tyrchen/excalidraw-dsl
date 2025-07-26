@@ -42,7 +42,7 @@ pub enum ParseError {
 
     #[error("Pest parsing failed: {0}")]
     PestError(#[from] pest::error::Error<crate::parser::Rule>),
-    
+
     #[error("Validation error: {0}")]
     ValidationError(String),
 }

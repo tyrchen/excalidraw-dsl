@@ -38,23 +38,20 @@ impl RateLimiter {
         }
     }
 
-    pub async fn check_rate_limit(
-        &self,
-        req: Request,
-        next: Next,
-    ) -> Result<Response, StatusCode> {
+    pub async fn check_rate_limit(&self, req: Request, next: Next) -> Result<Response, StatusCode> {
         // Extract client identifier (IP address)
-        let client_id = if let Some(ConnectInfo(addr)) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
-            addr.ip().to_string()
-        } else {
-            // Fallback to a default if no IP available
-            "unknown".to_string()
-        };
+        let client_id =
+            if let Some(ConnectInfo(addr)) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
+                addr.ip().to_string()
+            } else {
+                // Fallback to a default if no IP available
+                "unknown".to_string()
+            };
 
         // Check rate limit
         let now = Instant::now();
         let mut clients = self.clients.lock().unwrap();
-        
+
         let client_info = clients.entry(client_id.clone()).or_insert(ClientInfo {
             request_count: 0,
             window_start: now,
@@ -68,11 +65,12 @@ impl RateLimiter {
 
         // Check if limit exceeded
         if client_info.request_count >= self.max_requests {
-            log::warn!("Rate limit exceeded for client: {}", client_id);
+            log::warn!("Rate limit exceeded for client: {client_id}");
             return Ok((
                 StatusCode::TOO_MANY_REQUESTS,
                 "Rate limit exceeded. Please try again later.",
-            ).into_response());
+            )
+                .into_response());
         }
 
         // Increment counter
@@ -87,10 +85,8 @@ impl RateLimiter {
     pub fn cleanup_old_entries(&self) {
         let now = Instant::now();
         let mut clients = self.clients.lock().unwrap();
-        
-        clients.retain(|_, info| {
-            now.duration_since(info.window_start) <= self.window * 2
-        });
+
+        clients.retain(|_, info| now.duration_since(info.window_start) <= self.window * 2);
     }
 }
 

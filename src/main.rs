@@ -114,16 +114,16 @@ impl std::fmt::Display for LayoutAlgorithm {
 
 fn main() {
     env_logger::init();
-    
+
     let cli = Cli::parse();
 
     if let Err(e) = run(cli) {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
 
         // Print the error chain
         let mut source = e.source();
         while let Some(err) = source {
-            eprintln!("  Caused by: {}", err);
+            eprintln!("  Caused by: {err}");
             source = err.source();
         }
 
@@ -142,7 +142,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             watch,
         } => {
             if watch {
-                run_watch(WatchArgs { input, output, verbose })
+                run_watch(WatchArgs {
+                    input,
+                    output,
+                    verbose,
+                })
             } else {
                 run_convert(ConvertArgs {
                     input,
@@ -153,10 +157,28 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 })
             }
         }
-        Commands::Server { port, host, verbose } => run_server(ServerArgs { port, host, verbose }),
+        Commands::Server {
+            port,
+            host,
+            verbose,
+        } => run_server(ServerArgs {
+            port,
+            host,
+            verbose,
+        }),
         Commands::Validate { input, verbose } => run_validate(ValidateArgs { input, verbose }),
-        Commands::ValidateExcalidraw { input, verbose } => run_validate_excalidraw(ValidateExcalidrawArgs { input, verbose }),
-        Commands::Watch { input, output, verbose } => run_watch(WatchArgs { input, output, verbose }),
+        Commands::ValidateExcalidraw { input, verbose } => {
+            run_validate_excalidraw(ValidateExcalidrawArgs { input, verbose })
+        }
+        Commands::Watch {
+            input,
+            output,
+            verbose,
+        } => run_watch(WatchArgs {
+            input,
+            output,
+            verbose,
+        }),
     }
 }
 
@@ -197,7 +219,7 @@ fn run_convert(args: ConvertArgs) -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("✗ Validation failed: {}", e);
+                eprintln!("✗ Validation failed: {e}");
                 return Err(e.into());
             }
         }
@@ -230,10 +252,7 @@ fn run_convert(args: ConvertArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     if args.verbose {
         let element_count = count_elements_in_json(&output_json);
-        println!(
-            "✓ Successfully generated {} Excalidraw elements",
-            element_count
-        );
+        println!("✓ Successfully generated {element_count} Excalidraw elements");
     }
 
     println!("Generated Excalidraw JSON: {}", output_path.display());
@@ -263,7 +282,7 @@ fn run_server(args: ServerArgs) -> Result<(), Box<dyn std::error::Error>> {
 
         Ok(())
     }
-    
+
     #[cfg(not(feature = "server"))]
     {
         eprintln!("Server feature not enabled. Build with --features server to enable server functionality.");
@@ -292,7 +311,7 @@ fn run_validate(args: ValidateArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     // Create compiler and validate
     let compiler = EDSLCompiler::new();
-    
+
     match compiler.validate(&input_content) {
         Ok(()) => {
             println!("✓ Validation passed!");
@@ -301,14 +320,17 @@ fn run_validate(args: ValidateArgs) -> Result<(), Box<dyn std::error::Error>> {
                 if let Ok(elements) = compiler.compile_to_elements(&input_content) {
                     println!("  - {} elements found", elements.len());
                     let nodes = elements.iter().filter(|e| e.r#type == "rectangle").count();
-                    let edges = elements.iter().filter(|e| e.r#type == "arrow" || e.r#type == "line").count();
-                    println!("  - {} nodes, {} edges", nodes, edges);
+                    let edges = elements
+                        .iter()
+                        .filter(|e| e.r#type == "arrow" || e.r#type == "line")
+                        .count();
+                    println!("  - {nodes} nodes, {edges} edges");
                 }
             }
             Ok(())
         }
         Err(e) => {
-            eprintln!("✗ Validation failed: {}", e);
+            eprintln!("✗ Validation failed: {e}");
             Err(e.into())
         }
     }
@@ -335,7 +357,7 @@ fn run_validate_excalidraw(args: ValidateExcalidrawArgs) -> Result<(), Box<dyn s
 
     // Create compiler and validate
     let compiler = EDSLCompiler::new();
-    
+
     match compiler.validate_excalidraw(&input_content) {
         Ok(()) => {
             println!("✓ Valid Excalidraw file!");
@@ -345,21 +367,20 @@ fn run_validate_excalidraw(args: ValidateExcalidrawArgs) -> Result<(), Box<dyn s
                 if let Ok(value) = serde_json::from_str::<Value>(&input_content) {
                     let element_count = match &value {
                         Value::Array(elements) => elements.len(),
-                        Value::Object(map) => {
-                            map.get("elements")
-                                .and_then(|v| v.as_array())
-                                .map(|arr| arr.len())
-                                .unwrap_or(0)
-                        }
+                        Value::Object(map) => map
+                            .get("elements")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| arr.len())
+                            .unwrap_or(0),
                         _ => 0,
                     };
-                    println!("  - {} elements found", element_count);
+                    println!("  - {element_count} elements found");
                 }
             }
             Ok(())
         }
         Err(e) => {
-            eprintln!("✗ Validation failed: {}", e);
+            eprintln!("✗ Validation failed: {e}");
             Err(e.into())
         }
     }
@@ -372,7 +393,7 @@ struct WatchArgs {
 }
 
 fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
-    use notify::{Watcher, RecursiveMode, DebouncedEvent};
+    use notify::{DebouncedEvent, RecursiveMode, Watcher};
     use std::sync::mpsc::channel;
     use std::time::Duration;
 
@@ -401,42 +422,48 @@ fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
     // Main watch loop
     loop {
         match rx.recv() {
-            Ok(event) => {
-                match event {
-                    DebouncedEvent::Write(_) | DebouncedEvent::Create(_) => {
-                        println!("\n📝 File changed, recompiling...");
-                        match compile_file(&args.input, &output_path, args.verbose) {
-                            Ok(_) => println!("✓ Compilation successful"),
-                            Err(e) => eprintln!("✗ Compilation failed: {}", e),
-                        }
+            Ok(event) => match event {
+                DebouncedEvent::Write(_) | DebouncedEvent::Create(_) => {
+                    println!("\n📝 File changed, recompiling...");
+                    match compile_file(&args.input, &output_path, args.verbose) {
+                        Ok(_) => println!("✓ Compilation successful"),
+                        Err(e) => eprintln!("✗ Compilation failed: {e}"),
                     }
-                    DebouncedEvent::Remove(_) => {
-                        eprintln!("⚠️  Input file was removed");
-                    }
-                    _ => {}
                 }
-            }
-            Err(e) => eprintln!("Watch error: {:?}", e),
+                DebouncedEvent::Remove(_) => {
+                    eprintln!("⚠️  Input file was removed");
+                }
+                _ => {}
+            },
+            Err(e) => eprintln!("Watch error: {e:?}"),
         }
     }
 }
 
-fn compile_file(input_path: &PathBuf, output_path: &PathBuf, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn compile_file(
+    input_path: &PathBuf,
+    output_path: &PathBuf,
+    verbose: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let input_content = std::fs::read_to_string(input_path)?;
     let compiler = EDSLCompiler::new();
-    
+
     if verbose {
-        println!("Compiling {} -> {}", input_path.display(), output_path.display());
+        println!(
+            "Compiling {} -> {}",
+            input_path.display(),
+            output_path.display()
+        );
     }
-    
+
     let output_json = compiler.compile(&input_content)?;
     std::fs::write(output_path, &output_json)?;
-    
+
     if verbose {
         let element_count = count_elements_in_json(&output_json);
-        println!("Generated {} elements", element_count);
+        println!("Generated {element_count} elements");
     }
-    
+
     Ok(())
 }
 
@@ -484,7 +511,7 @@ user -> api -> db
         // Run the CLI
         let result = run_convert(args);
         if let Err(e) = &result {
-            eprintln!("CLI test error: {}", e);
+            eprintln!("CLI test error: {e}");
         }
         assert!(result.is_ok());
 

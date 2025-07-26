@@ -63,21 +63,24 @@ start -> end
     assert_eq!(elements.len(), 5); // 2 nodes + 2 text elements + 1 edge
 
     // Find the rectangle nodes (not text elements)
-    let rectangles: Vec<&Value> = elements.iter()
+    let rectangles: Vec<&Value> = elements
+        .iter()
         .filter(|e| e["type"] == "rectangle")
         .collect();
-    
+
     assert_eq!(rectangles.len(), 2);
-    
+
     // Check first rectangle node for correct colors
     // Note: we can't guarantee order, so find by color
-    let green_node = rectangles.iter()
+    let green_node = rectangles
+        .iter()
         .find(|n| n["strokeColor"] == "#22c55e")
         .expect("Should find green node");
     assert_eq!(green_node["backgroundColor"], "#dcfce7");
 
-    // Check second node has correct colors  
-    let red_node = rectangles.iter()
+    // Check second node has correct colors
+    let red_node = rectangles
+        .iter()
         .find(|n| n["strokeColor"] == "#ef4444")
         .expect("Should find red node");
     assert_eq!(red_node["backgroundColor"], "#fee2e2");
@@ -220,17 +223,16 @@ node1 -> node2
     assert_eq!(elements.len(), 5);
 
     // Find text elements
-    let text_elements: Vec<&Value> = elements.iter()
-        .filter(|e| e["type"] == "text")
-        .collect();
-    
+    let text_elements: Vec<&Value> = elements.iter().filter(|e| e["type"] == "text").collect();
+
     assert_eq!(text_elements.len(), 2);
-    
+
     // Check that we have both expected texts
-    let texts: Vec<&str> = text_elements.iter()
+    let texts: Vec<&str> = text_elements
+        .iter()
         .filter_map(|e| e["text"].as_str())
         .collect();
-    
+
     assert!(texts.contains(&"node1"));
     assert!(texts.contains(&"With Label"));
 }
@@ -371,12 +373,13 @@ node[Test Node]
 
     let result = compile_to_json(edsl).unwrap();
     let elements = result["elements"].as_array().unwrap();
-    
+
     // Should have 1 node + 1 text element = 2 elements
     assert_eq!(elements.len(), 2);
-    
+
     // Find the rectangle node (not text element)
-    let node = elements.iter()
+    let node = elements
+        .iter()
         .find(|e| e["type"] == "rectangle")
         .expect("Should find rectangle node");
 
@@ -395,12 +398,13 @@ node[Test Node]
     assert!(node["strokeStyle"].is_string());
     assert!(node["roughness"].is_number());
     assert!(node["opacity"].is_number());
-    
+
     // Text is now in a separate text element, not in the node
-    let text_element = elements.iter()
+    let text_element = elements
+        .iter()
         .find(|e| e["type"] == "text")
         .expect("Should find text element");
-    
+
     assert!(text_element["text"].is_string());
     assert!(text_element["fontSize"].is_number());
     assert!(text_element["fontFamily"].is_number());
@@ -416,12 +420,13 @@ a -> b
 
     let result = compile_to_json(edsl).unwrap();
     let elements = result["elements"].as_array().unwrap();
-    
+
     // 2 nodes + 2 text elements + 1 edge = 5
     assert_eq!(elements.len(), 5);
-    
+
     // Find the edge element
-    let edge = elements.iter()
+    let edge = elements
+        .iter()
         .find(|e| e["type"] == "arrow")
         .expect("Should find arrow element");
 
@@ -449,7 +454,7 @@ fn test_large_graph_performance() {
     // Generate a large graph with 100 nodes
     let mut edsl = String::new();
     for i in 0..100 {
-        edsl.push_str(&format!("node{}[Node {}]\n", i, i));
+        edsl.push_str(&format!("node{i}[Node {i}]\n"));
     }
 
     // Connect them in a chain
@@ -464,8 +469,7 @@ fn test_large_graph_performance() {
     assert!(result.is_ok());
     assert!(
         duration.as_secs() < 5,
-        "Large graph took too long to compile: {:?}",
-        duration
+        "Large graph took too long to compile: {duration:?}"
     );
 
     let result_value = result.unwrap();

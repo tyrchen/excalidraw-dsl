@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEDSLStore } from '../store/edsl-store';
 import { EDSLFile } from '../types/edsl';
 import { Button } from './ui/button';
@@ -6,16 +6,16 @@ import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { 
-  FileText, 
-  Plus, 
-  Download, 
-  Upload, 
-  Trash2, 
+import {
+  FileText,
+  Plus,
   FileCode,
   Clock,
+  FolderOpen,
+  Loader2,
 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { fileService } from '../services/file-service';
+import { Alert, AlertDescription } from './ui/alert';
 
 export const FileManager: React.FC = () => {
   const {
@@ -23,30 +23,46 @@ export const FileManager: React.FC = () => {
     currentFile,
     setCurrentFile,
     addFile,
-    deleteFile,
     editorContent,
+    updateFileContent,
   } = useEDSLStore();
 
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [newFileContent, setNewFileContent] = useState('');
-  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [serverPath, setServerPath] = useState<string>('');
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [folderInputRef, setFolderInputRef] = useState<HTMLInputElement | null>(null);
+
+  // Update file content when editor changes (for local files)
+  useEffect(() => {
+    if (!currentFile) return;
+
+    // Update the file content in store when editor content changes
+    if (editorContent !== currentFile.content) {
+      updateFileContent(currentFile.name, editorContent);
+    }
+  }, [editorContent, currentFile, updateFileContent]);
 
   const handleCreateFile = () => {
     if (!newFileName.trim()) return;
-    
+
     const fileName = newFileName.endsWith('.edsl') ? newFileName : `${newFileName}.edsl`;
-    const newFile: EDSLFile = {
-      name: fileName,
-      content: newFileContent || `---
+    const content = newFileContent || `---
 layout: dagre
 ---
 
 # New diagram
-node1[Node 1] -> node2[Node 2]`,
+node1[Node 1] -> node2[Node 2]`;
+
+    // Add to local state
+    const newFile: EDSLFile = {
+      name: fileName,
+      content,
       lastModified: new Date(),
     };
-    
+
     addFile(newFile);
     setCurrentFile(newFile);
     setIsNewFileDialogOpen(false);
@@ -58,53 +74,61 @@ node1[Node 1] -> node2[Node 2]`,
     setCurrentFile(file);
   };
 
-  const handleDeleteFile = (file: EDSLFile, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
-      deleteFile(file.name);
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsLoadingFiles(true);
+    setServerError(null);
+
+    try {
+      // Get the absolute folder path from the first file
+      const firstFile = files[0];
+      let folderPath = '';
+
+      if (firstFile.webkitRelativePath) {
+        // Get the folder path by removing the filename
+        const pathParts = firstFile.webkitRelativePath.split('/');
+        pathParts.pop(); // Remove filename
+        folderPath = pathParts.join('/');
+      }
+
+      // If we can't get the path from webkitRelativePath, use a default
+      if (!folderPath) {
+        folderPath = 'examples';
+      }
+
+      console.log('Using folder path:', folderPath);
+
+      // Use the server API to get file list from the folder path
+      const serverFiles = await fileService.loadFilesFromDirectory(folderPath);
+
+      if (serverFiles.length > 0) {
+        // Clear existing files
+        useEDSLStore.getState().clearFiles();
+
+        // Add all loaded files
+        serverFiles.forEach(file => {
+          addFile(file);
+        });
+
+        // Set the first file as current
+        setCurrentFile(serverFiles[0]);
+        setServerPath(folderPath);
+      } else {
+        setServerError('No .edsl files found in the selected directory');
+      }
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Failed to load files from server');
+      console.error('Failed to load server files:', error);
+    } finally {
+      setIsLoadingFiles(false);
     }
-  };
 
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const edslFile: EDSLFile = {
-        name: file.name,
-        content,
-        lastModified: new Date(),
-      };
-      addFile(edslFile);
-      setCurrentFile(edslFile);
-    };
-    reader.readAsText(file);
-    
-    // Reset file input
-    if (fileInputRef) {
-      fileInputRef.value = '';
+    // Reset folder input
+    if (folderInputRef) {
+      folderInputRef.value = '';
     }
-  };
-
-  const handleExportFile = (file: EDSLFile) => {
-    const blob = new Blob([file.content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportCurrent = () => {
-    if (!currentFile) return;
-    
-    const updatedFile = { ...currentFile, content: editorContent };
-    handleExportFile(updatedFile);
   };
 
   const formatDate = (date: Date) => {
@@ -117,21 +141,55 @@ node1[Node 1] -> node2[Node 2]`,
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 border-r">
+    <div className="flex flex-col h-full bg-gray-50 border-r">
       {/* Header */}
-      <div className="p-4 border-b bg-white">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold flex items-center">
-            <FileCode className="h-5 w-5 mr-2" />
+      <div className="p-4 bg-white border-b">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="flex items-center text-lg font-semibold">
+            <FileCode className="mr-2 w-5 h-5" />
             Files
           </h2>
         </div>
-        
-        <div className="flex space-x-2">
+
+        {serverPath && (
+          <div className="px-2 py-1 mb-2 text-xs text-gray-500 bg-gray-100 rounded">
+            <span className="font-medium">Folder:</span> {serverPath}
+          </div>
+        )}
+
+        {serverError && (
+          <Alert variant="destructive" className="mb-2">
+            <AlertDescription>{serverError}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex gap-2">
+          {/* Open Folder Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => folderInputRef?.click()}
+            disabled={isLoadingFiles}
+          >
+            {isLoadingFiles ? (
+              <>
+                <Loader2 className="mr-1 w-4 h-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <FolderOpen className="mr-1 w-4 h-4" />
+                Open Folder
+              </>
+            )}
+          </Button>
+
+          {/* New File Dialog */}
           <Dialog open={isNewFileDialogOpen} onOpenChange={setIsNewFileDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="flex-1">
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="mr-1 w-4 h-4" />
                 New
               </Button>
             </DialogTrigger>
@@ -165,8 +223,8 @@ node1[Node 1] -> node2[Node 2]`,
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setIsNewFileDialogOpen(false)}
                   >
                     Cancel
@@ -178,44 +236,17 @@ node1[Node 1] -> node2[Node 2]`,
               </div>
             </DialogContent>
           </Dialog>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fileInputRef?.click()}
-            title="Import EDSL file"
-          >
-            <Upload className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleExportCurrent}
-            disabled={!currentFile}
-            title="Export current file"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
         </div>
-        
-        <input
-          type="file"
-          ref={setFileInputRef}
-          onChange={handleImportFile}
-          accept=".edsl,.txt"
-          style={{ display: 'none' }}
-        />
       </div>
 
       {/* File List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="overflow-y-auto flex-1">
         {files.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
-            <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <FileText className="mx-auto mb-3 w-12 h-12 text-gray-300" />
             <p className="text-sm">No files yet</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Create a new file to get started
+            <p className="mt-1 text-xs text-gray-400">
+              Open a folder to get started
             </p>
           </div>
         ) : (
@@ -225,49 +256,25 @@ node1[Node 1] -> node2[Node 2]`,
                 key={file.name}
                 className={`
                   p-3 rounded-lg cursor-pointer group transition-colors mb-2
-                  ${currentFile?.name === file.name 
-                    ? 'bg-blue-100 border border-blue-200' 
+                  ${currentFile?.name === file.name
+                    ? 'bg-blue-100 border border-blue-200'
                     : 'bg-white hover:bg-gray-50 border border-transparent hover:border-gray-200'
                   }
                 `}
                 onClick={() => handleFileSelect(file)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center min-w-0 flex-1">
-                    <FileText className="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-1 items-center min-w-0">
+                    <FileText className="flex-shrink-0 mr-2 w-4 h-4 text-blue-600" />
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {file.name}
                       </p>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <Clock className="h-3 w-3 mr-1" />
+                      <div className="flex items-center mt-1 text-xs text-gray-500">
+                        <Clock className="mr-1 w-3 h-3" />
                         {formatDate(file.lastModified)}
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExportFile(file);
-                      }}
-                      title="Export file"
-                      className="h-6 w-6 p-0"
-                    >
-                      <Download className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => handleDeleteFile(file, e)}
-                      title="Delete file"
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -275,6 +282,17 @@ node1[Node 1] -> node2[Node 2]`,
           </div>
         )}
       </div>
+
+      {/* Hidden folder input */}
+      <input
+        type="file"
+        ref={setFolderInputRef}
+        onChange={handleFolderSelect}
+        webkitdirectory=""
+        directory=""
+        accept=".edsl"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ interface EDSLStore {
   addFile: (file: EDSLFile) => void;
   updateFileContent: (name: string, content: string) => void;
   deleteFile: (name: string) => void;
+  clearFiles: () => void;
   
   // Editor state
   editorContent: string;
@@ -43,10 +44,13 @@ export const useEDSLStore = create<EDSLStore>()(
       currentFile: null,
       files: [],
       setCurrentFile: (file) => {
-        set({ currentFile: file });
-        if (file) {
-          set({ editorContent: file.content });
-        }
+        set({ 
+          currentFile: file,
+          editorContent: file ? file.content : '',
+          // Clear validation and compilation results when switching files
+          validationResult: null,
+          compilationResult: null,
+        });
       },
       addFile: (file) => {
         set((state) => ({
@@ -70,6 +74,13 @@ export const useEDSLStore = create<EDSLStore>()(
           files: state.files.filter(f => f.name !== name),
           currentFile: state.currentFile?.name === name ? null : state.currentFile,
         }));
+      },
+      clearFiles: () => {
+        set({
+          files: [],
+          currentFile: null,
+          editorContent: '',
+        });
       },
       
       // Editor state

@@ -100,8 +100,8 @@ pub struct GroupDefinition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GroupType {
-    BasicGroup,      // group "name" { ... }
-    FlowGroup,       // flow "name" { ... }
+    BasicGroup,            // group "name" { ... }
+    FlowGroup,             // flow "name" { ... }
     SemanticGroup(String), // service "name" { ... }, layer "name" { ... }, etc.
 }
 
@@ -196,7 +196,6 @@ impl ArrowType {
         }
     }
 }
-
 
 impl StrokeStyle {
     pub fn from_str(s: &str) -> Option<Self> {

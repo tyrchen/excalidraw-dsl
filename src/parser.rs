@@ -19,11 +19,12 @@ pub struct EDSLParser;
 pub fn parse_edsl(input: &str) -> Result<ParsedDocument> {
     // Validate input size
     if input.len() > MAX_INPUT_SIZE {
-        return Err(ParseError::ValidationError(
-            format!("Input size exceeds maximum allowed size of {} bytes", MAX_INPUT_SIZE)
-        ).into());
+        return Err(ParseError::ValidationError(format!(
+            "Input size exceeds maximum allowed size of {MAX_INPUT_SIZE} bytes"
+        ))
+        .into());
     }
-    
+
     let pairs = EDSLParser::parse(Rule::file, input).map_err(ParseError::PestError)?;
 
     build_document(pairs)
@@ -39,71 +40,77 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
     let mut connections = Vec::new();
 
     for pair in pairs {
-        match pair.as_rule() {
-            Rule::file => {
-                for inner_pair in pair.into_inner() {
-                    match inner_pair.as_rule() {
-                        Rule::config => {
-                            config = parse_config(inner_pair)?;
-                        }
-                        Rule::statement => {
-                            for stmt_pair in inner_pair.into_inner() {
-                                match stmt_pair.as_rule() {
-                                    Rule::component_type_def => {
-                                        let comp_type = parse_component_type(stmt_pair)?;
-                                        component_types.insert(comp_type.name.clone(), comp_type);
-                                    }
-                                    Rule::node_def => {
-                                        nodes.push(parse_node_definition(stmt_pair)?);
-                                    }
-                                    Rule::edge_def => {
-                                        edges.push(parse_edge_definition(stmt_pair)?);
-                                    }
-                                    Rule::container_def => {
-                                        containers.push(parse_container_definition(stmt_pair)?);
-                                    }
-                                    Rule::group_def => {
-                                        groups.push(parse_group_definition(stmt_pair)?);
-                                    }
-                                    Rule::connection_def => {
-                                        connections.push(parse_connection(stmt_pair)?);
-                                    }
-                                    Rule::connections_def => {
-                                        let conns = parse_connections(stmt_pair)?;
-                                        connections.extend(conns);
-                                    }
-                                    _ => {
-                                        log::warn!("Unknown statement rule: {:?}", stmt_pair.as_rule());
-                                    }
+        if pair.as_rule() == Rule::file {
+            for inner_pair in pair.into_inner() {
+                match inner_pair.as_rule() {
+                    Rule::config => {
+                        config = parse_config(inner_pair)?;
+                    }
+                    Rule::statement => {
+                        for stmt_pair in inner_pair.into_inner() {
+                            match stmt_pair.as_rule() {
+                                Rule::component_type_def => {
+                                    let comp_type = parse_component_type(stmt_pair)?;
+                                    component_types.insert(comp_type.name.clone(), comp_type);
+                                }
+                                Rule::node_def => {
+                                    nodes.push(parse_node_definition(stmt_pair)?);
+                                }
+                                Rule::edge_def => {
+                                    edges.push(parse_edge_definition(stmt_pair)?);
+                                }
+                                Rule::container_def => {
+                                    containers.push(parse_container_definition(stmt_pair)?);
+                                }
+                                Rule::group_def => {
+                                    groups.push(parse_group_definition(stmt_pair)?);
+                                }
+                                Rule::connection_def => {
+                                    connections.push(parse_connection(stmt_pair)?);
+                                }
+                                Rule::connections_def => {
+                                    let conns = parse_connections(stmt_pair)?;
+                                    connections.extend(conns);
+                                }
+                                _ => {
+                                    log::warn!("Unknown statement rule: {:?}", stmt_pair.as_rule());
                                 }
                             }
                         }
-                        Rule::EOI => break,
-                        _ => {}
                     }
+                    Rule::EOI => break,
+                    _ => {}
                 }
             }
-            _ => {}
         }
     }
 
     // Validate complexity limits
     if nodes.len() > MAX_NODES {
-        return Err(ParseError::ValidationError(
-            format!("Number of nodes ({}) exceeds maximum allowed ({})", nodes.len(), MAX_NODES)
-        ).into());
+        return Err(ParseError::ValidationError(format!(
+            "Number of nodes ({}) exceeds maximum allowed ({})",
+            nodes.len(),
+            MAX_NODES
+        ))
+        .into());
     }
-    
+
     if edges.len() > MAX_EDGES {
-        return Err(ParseError::ValidationError(
-            format!("Number of edges ({}) exceeds maximum allowed ({})", edges.len(), MAX_EDGES)
-        ).into());
+        return Err(ParseError::ValidationError(format!(
+            "Number of edges ({}) exceeds maximum allowed ({})",
+            edges.len(),
+            MAX_EDGES
+        ))
+        .into());
     }
-    
+
     if containers.len() > MAX_CONTAINERS {
-        return Err(ParseError::ValidationError(
-            format!("Number of containers ({}) exceeds maximum allowed ({})", containers.len(), MAX_CONTAINERS)
-        ).into());
+        return Err(ParseError::ValidationError(format!(
+            "Number of containers ({}) exceeds maximum allowed ({})",
+            containers.len(),
+            MAX_CONTAINERS
+        ))
+        .into());
     }
 
     Ok(ParsedDocument {
@@ -141,11 +148,10 @@ fn parse_config(pair: pest::iterators::Pair<Rule>) -> Result<GlobalConfig> {
 }
 
 fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
-    let inner = pair.into_inner().next()
-        .ok_or_else(|| ParseError::Syntax {
-            line: 0,
-            message: "Expected statement content".to_string(),
-        })?;
+    let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+        line: 0,
+        message: "Expected statement content".to_string(),
+    })?;
 
     match inner.as_rule() {
         Rule::node_def => Ok(Statement::Node(parse_node_definition(inner)?)),
@@ -155,7 +161,8 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
         _ => Err(ParseError::Syntax {
             line: 0,
             message: format!("Unexpected rule in statement: {:?}", inner.as_rule()),
-        }.into()),
+        }
+        .into()),
     }
 }
 
@@ -224,11 +231,7 @@ fn parse_component_type(pair: pest::iterators::Pair<Rule>) -> Result<ComponentTy
         }
     }
 
-    Ok(ComponentTypeDefinition {
-        name,
-        shape,
-        style,
-    })
+    Ok(ComponentTypeDefinition { name, shape, style })
 }
 
 fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefinition> {
@@ -273,11 +276,10 @@ fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefini
 }
 
 fn parse_edge_definition(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition> {
-    let inner = pair.into_inner().next()
-        .ok_or_else(|| ParseError::Syntax {
-            line: 0,
-            message: "Expected edge content".to_string(),
-        })?;
+    let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+        line: 0,
+        message: "Expected edge content".to_string(),
+    })?;
 
     match inner.as_rule() {
         Rule::single_edge => parse_single_edge(inner),
@@ -285,7 +287,8 @@ fn parse_edge_definition(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefini
         _ => Err(ParseError::Syntax {
             line: 0,
             message: format!("Unexpected rule in edge definition: {:?}", inner.as_rule()),
-        }.into()),
+        }
+        .into()),
     }
 }
 
@@ -335,16 +338,13 @@ fn parse_single_edge(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition
             }
             Rule::edge_label => {
                 for label_part in inner_pair.into_inner() {
-                    match label_part.as_rule() {
-                        Rule::edge_label_content => {
-                            let content = label_part.as_str();
-                            if content.starts_with('"') && content.ends_with('"') {
-                                label = Some(parse_string_literal(content)?);
-                            } else {
-                                label = Some(content.trim().to_string());
-                            }
+                    if label_part.as_rule() == Rule::edge_label_content {
+                        let content = label_part.as_str();
+                        if content.starts_with('"') && content.ends_with('"') {
+                            label = Some(parse_string_literal(content)?);
+                        } else {
+                            label = Some(content.trim().to_string());
                         }
-                        _ => {}
                     }
                 }
             }
@@ -385,16 +385,13 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
             }
             Rule::edge_label => {
                 for label_part in inner_pair.into_inner() {
-                    match label_part.as_rule() {
-                        Rule::edge_label_content => {
-                            let content = label_part.as_str();
-                            if content.starts_with('"') && content.ends_with('"') {
-                                label = Some(parse_string_literal(content)?);
-                            } else {
-                                label = Some(content.trim().to_string());
-                            }
+                    if label_part.as_rule() == Rule::edge_label_content {
+                        let content = label_part.as_str();
+                        if content.starts_with('"') && content.ends_with('"') {
+                            label = Some(parse_string_literal(content)?);
+                        } else {
+                            label = Some(content.trim().to_string());
                         }
-                        _ => {}
                     }
                 }
             }
@@ -482,9 +479,10 @@ fn parse_group_definition(pair: pest::iterators::Pair<Rule>) -> Result<GroupDefi
 
     // Generate ID from label if not provided
     let final_id = id.unwrap_or_else(|| {
-        label.as_ref()
+        label
+            .as_ref()
             .map(|l| l.to_lowercase().replace(' ', "_"))
-            .unwrap_or_else(|| format!("group_{}", Uuid::new_v4().to_string()))
+            .unwrap_or_else(|| format!("group_{}", Uuid::new_v4()))
     });
 
     Ok(GroupDefinition {
@@ -616,7 +614,7 @@ fn parse_property_value(pair: pest::iterators::Pair<Rule>) -> Result<AttributeVa
             let num_str = inner.as_str();
             let num = num_str.parse::<f64>().map_err(|_| ParseError::Syntax {
                 line: 0,
-                message: format!("Invalid number: {}", num_str),
+                message: format!("Invalid number: {num_str}"),
             })?;
             Ok(AttributeValue::Number(num))
         }
@@ -654,21 +652,21 @@ fn parse_connection(pair: pest::iterators::Pair<Rule>) -> Result<ConnectionDefin
 
     // Based on the grammar, the pairs come in order: from string, to string, style block
     let mut inner_pairs = pair.into_inner();
-    
+
     // First string literal is "from"
     if let Some(from_pair) = inner_pairs.next() {
         if from_pair.as_rule() == Rule::string_literal {
             from = from_pair.as_str().trim_matches('"').to_string();
         }
     }
-    
+
     // Second string literal is "to"
     if let Some(to_pair) = inner_pairs.next() {
         if to_pair.as_rule() == Rule::string_literal {
             to = to_pair.as_str().trim_matches('"').to_string();
         }
     }
-    
+
     // Third is the style block
     if let Some(style_pair) = inner_pairs.next() {
         if style_pair.as_rule() == Rule::connection_style {
@@ -698,14 +696,14 @@ fn parse_connections(pair: pest::iterators::Pair<Rule>) -> Result<Vec<Connection
 
     // Based on the grammar, the pairs come in order: from string, to array, style block
     let mut inner_pairs = pair.into_inner();
-    
+
     // First string literal is "from"
     if let Some(from_pair) = inner_pairs.next() {
         if from_pair.as_rule() == Rule::string_literal {
             from = from_pair.as_str().trim_matches('"').to_string();
         }
     }
-    
+
     // Second is the connection_targets array
     if let Some(targets_pair) = inner_pairs.next() {
         if targets_pair.as_rule() == Rule::connection_targets {
@@ -716,7 +714,7 @@ fn parse_connections(pair: pest::iterators::Pair<Rule>) -> Result<Vec<Connection
             }
         }
     }
-    
+
     // Third is the style block
     if let Some(style_pair) = inner_pairs.next() {
         if style_pair.as_rule() == Rule::connection_style {
@@ -725,11 +723,14 @@ fn parse_connections(pair: pest::iterators::Pair<Rule>) -> Result<Vec<Connection
     }
 
     // Create a connection for each target
-    Ok(to_list.into_iter().map(|to| ConnectionDefinition {
-        from: from.clone(),
-        to: vec![to],
-        style: style.clone(),
-    }).collect())
+    Ok(to_list
+        .into_iter()
+        .map(|to| ConnectionDefinition {
+            from: from.clone(),
+            to: vec![to],
+            style: style.clone(),
+        })
+        .collect())
 }
 
 fn parse_connection_style(pair: pest::iterators::Pair<Rule>) -> Result<EdgeStyleDefinition> {
@@ -757,7 +758,7 @@ fn parse_connection_style(pair: pest::iterators::Pair<Rule>) -> Result<EdgeStyle
                         });
                     }
                     Rule::string_literal => {
-                        let value = parse_string_literal(&inner.as_str())?;
+                        let value = parse_string_literal(inner.as_str())?;
                         // Determine which field based on context
                         if style.label.is_none() {
                             style.label = Some(value);
@@ -766,8 +767,8 @@ fn parse_connection_style(pair: pest::iterators::Pair<Rule>) -> Result<EdgeStyle
                         }
                     }
                     Rule::number => {
-                        let value: f64 = inner.as_str().parse()
-                            .map_err(|_| ParseError::Syntax {
+                        let value: f64 =
+                            inner.as_str().parse().map_err(|_| ParseError::Syntax {
                                 line: inner.as_span().start_pos().line_col().0,
                                 message: "Invalid number".to_string(),
                             })?;
@@ -842,7 +843,7 @@ mod tests {
         layout: dagre
         theme: dark
         ---
-        
+
         web_server[Web Server]
         "#;
 
@@ -853,4 +854,3 @@ mod tests {
         assert_eq!(result.nodes.len(), 1);
     }
 }
-
