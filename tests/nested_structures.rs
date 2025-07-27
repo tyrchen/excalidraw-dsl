@@ -118,7 +118,6 @@ node3 -> node4
 }
 
 #[test]
-#[ignore = "Nested groups not yet implemented"]
 fn test_nested_groups() {
     let edsl = r#"
 group "Outer Group" {
@@ -165,7 +164,7 @@ external -> outer1
 }
 
 #[test]
-#[ignore = "Mixed nested structures not yet implemented"]
+#[ignore = "Deep nested structures (container in group in container) not fully implemented"]
 fn test_mixed_containers_and_groups() {
     let edsl = r#"
 container "System Container" {
@@ -233,7 +232,6 @@ sys_node -> ext1
 }
 
 #[test]
-#[ignore = "Flow groups not yet implemented"]
 fn test_flow_groups() {
     let edsl = r#"
 flow "User Flow" {
@@ -284,7 +282,6 @@ start -> admin_start: "Switch to Admin"
 }
 
 #[test]
-#[ignore = "Semantic groups not yet implemented"]
 fn test_semantic_groups() {
     let edsl = r#"
 service "API Service" {
@@ -336,9 +333,13 @@ endpoint2 -> db: "Store user"
 }
 
 #[test]
-#[ignore = "Containers with internal edges not yet implemented"]
+#[ignore = "Containers with cyclic internal edges require force layout - dagre cycle detection prevents compilation"]
 fn test_container_with_internal_edges_only() {
     let edsl = r#"
+---
+layout: force
+---
+
 container "Isolated System" {
     node1[Node 1]
     node2[Node 2]
@@ -392,7 +393,7 @@ container "Outer" {
 }
 
 #[test]
-#[ignore = "Container and group styling not yet implemented"]
+#[ignore = "Container and group style: { ... } syntax not implemented in parser"]
 fn test_container_and_group_styling() {
     let edsl = r##"
 container "Styled Container" style: {

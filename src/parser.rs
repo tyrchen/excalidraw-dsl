@@ -178,14 +178,21 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
         Rule::edge_def => {
             // Edge chains need special handling since they expand to multiple edges
             let edges = parse_edge_definition(inner)?;
-            if edges.len() == 1 {
-                Ok(Statement::Edge(edges.into_iter().next().unwrap()))
-            } else {
+            if edges.is_empty() {
+                return Err(ParseError::Syntax {
+                    line: 0,
+                    message: "Edge definition resulted in no edges".to_string(),
+                }
+                .into());
+            }
+            if edges.len() > 1 {
                 // For now, return the first edge and log a warning
                 // A more complete solution would require changing Statement to support multiple edges
                 log::warn!("Edge chain in container/group context - only first edge will be used");
-                Ok(Statement::Edge(edges.into_iter().next().unwrap()))
             }
+            Ok(Statement::Edge(
+                edges.into_iter().next().expect("edges is not empty"),
+            ))
         }
         Rule::container_def => Ok(Statement::Container(parse_container_definition(inner)?)),
         Rule::group_def => Ok(Statement::Group(parse_group_definition(inner)?)),
@@ -492,7 +499,15 @@ fn parse_group_definition(pair: pest::iterators::Pair<Rule>) -> Result<GroupDefi
             }
             Rule::statement => {
                 // Check what kind of statement this is
-                let stmt_inner = inner_pair.clone().into_inner().next().unwrap();
+                let stmt_inner =
+                    inner_pair
+                        .clone()
+                        .into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            line: 0,
+                            message: "Expected statement content in group".to_string(),
+                        })?;
                 match stmt_inner.as_rule() {
                     Rule::edge_def => {
                         // Handle edge definitions specially to support chains
@@ -599,7 +614,15 @@ fn parse_container_definition(pair: pest::iterators::Pair<Rule>) -> Result<Conta
             }
             Rule::statement => {
                 // Check what kind of statement this is
-                let stmt_inner = inner_pair.clone().into_inner().next().unwrap();
+                let stmt_inner =
+                    inner_pair
+                        .clone()
+                        .into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            line: 0,
+                            message: "Expected statement content in container".to_string(),
+                        })?;
                 match stmt_inner.as_rule() {
                     Rule::edge_def => {
                         // Handle edge definitions specially to support chains
@@ -681,7 +704,10 @@ fn parse_style_block(pair: pest::iterators::Pair<Rule>) -> Result<HashMap<String
 }
 
 fn parse_property_value(pair: pest::iterators::Pair<Rule>) -> Result<AttributeValue> {
-    let inner = pair.into_inner().next().unwrap();
+    let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+        line: 0,
+        message: "Expected property value".to_string(),
+    })?;
 
     match inner.as_rule() {
         Rule::string_literal => Ok(AttributeValue::String(parse_string_literal(
@@ -1039,7 +1065,14 @@ fn parse_diagram_definition(pair: pest::iterators::Pair<Rule>) -> Result<Diagram
 }
 
 fn parse_diagram_type(pair: pest::iterators::Pair<Rule>) -> Result<DiagramType> {
-    let type_name = pair.into_inner().next().unwrap().as_str();
+    let type_name = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            line: 0,
+            message: "Expected diagram type name".to_string(),
+        })?
+        .as_str();
     match type_name {
         "architecture" => Ok(DiagramType::Architecture),
         "flow" => Ok(DiagramType::Flow),
@@ -1078,7 +1111,14 @@ fn parse_layout_definition(pair: pest::iterators::Pair<Rule>) -> Result<LayoutDe
 }
 
 fn parse_layout_type(pair: pest::iterators::Pair<Rule>) -> Result<LayoutType> {
-    let type_name = pair.into_inner().next().unwrap().as_str();
+    let type_name = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            line: 0,
+            message: "Expected layout type name".to_string(),
+        })?
+        .as_str();
     match type_name {
         "layered" => Ok(LayoutType::Layered),
         "force" => Ok(LayoutType::Force),
@@ -1090,7 +1130,14 @@ fn parse_layout_type(pair: pest::iterators::Pair<Rule>) -> Result<LayoutType> {
 }
 
 fn parse_layout_direction(pair: pest::iterators::Pair<Rule>) -> Result<LayoutDirection> {
-    let direction_name = pair.into_inner().next().unwrap().as_str();
+    let direction_name = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            line: 0,
+            message: "Expected layout direction name".to_string(),
+        })?
+        .as_str();
     match direction_name {
         "horizontal" => Ok(LayoutDirection::Horizontal),
         "vertical" => Ok(LayoutDirection::Vertical),

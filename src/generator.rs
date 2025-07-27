@@ -726,7 +726,7 @@ impl ExcalidrawGenerator {
             container_id: None,
             text_align: None,
             vertical_align: None,
-            is_container: None,
+            is_container: Some(true),
         }))
     }
 

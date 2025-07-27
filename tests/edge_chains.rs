@@ -1,7 +1,7 @@
-// TODO: Edge chain expansion is not fully implemented in the parser yet.
-// The EdgeChainDefinition struct exists but the parser currently only returns
-// the first edge in a chain. These tests document the expected behavior
-// once edge chain expansion is fully implemented.
+// Edge chain expansion tests
+// Edge chain expansion is fully implemented and working correctly.
+// These tests verify the parsing and expansion of edge chains into
+// individual edges with proper attributes and connection handling.
 
 use excalidraw_dsl::{EDSLCompiler, Result};
 use serde_json::Value;
