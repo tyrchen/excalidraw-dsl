@@ -1211,9 +1211,11 @@ mod tests {
 
     #[test]
     fn test_node_with_text_color_generates_colored_text() {
-        let mut attributes = ExcalidrawAttributes::default();
-        attributes.text_color = Some("#ffffff".to_string());
-        attributes.background_color = Some("#000000".to_string());
+        let attributes = ExcalidrawAttributes {
+            text_color: Some("#ffffff".to_string()),
+            background_color: Some("#000000".to_string()),
+            ..Default::default()
+        };
 
         let node_data = NodeData {
             id: "colored_node".to_string(),
@@ -1266,8 +1268,10 @@ mod tests {
 
     #[test]
     fn test_container_with_text_color() {
-        let mut container_attrs = ExcalidrawAttributes::default();
-        container_attrs.text_color = Some("#0000ff".to_string());
+        let container_attrs = ExcalidrawAttributes {
+            text_color: Some("#0000ff".to_string()),
+            ..Default::default()
+        };
 
         let container = ContainerData {
             id: Some("container1".to_string()),
