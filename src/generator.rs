@@ -1146,4 +1146,224 @@ mod tests {
         assert!(edge.end_binding.is_some());
         assert_eq!(edge.end_arrowhead, Some(ELEMENT_TYPE_ARROW.to_string()));
     }
+
+    #[test]
+    fn test_generate_text_element_with_color() {
+        let text_color = Some("#ff0000".to_string());
+        let text_element = ExcalidrawGenerator::generate_text_element(
+            "Colored Text",
+            100.0,
+            200.0,
+            "container_id",
+            20.0,
+            &None,
+            &text_color,
+        )
+        .unwrap();
+
+        assert_eq!(text_element.r#type, ELEMENT_TYPE_TEXT);
+        assert_eq!(text_element.text, Some("Colored Text".to_string()));
+        assert_eq!(text_element.stroke_color, "#ff0000");
+        assert_eq!(text_element.background_color, "transparent");
+    }
+
+    #[test]
+    fn test_generate_text_element_without_color() {
+        let text_element = ExcalidrawGenerator::generate_text_element(
+            "Default Text",
+            100.0,
+            200.0,
+            "container_id",
+            20.0,
+            &None,
+            &None, // No color specified
+        )
+        .unwrap();
+
+        assert_eq!(text_element.r#type, ELEMENT_TYPE_TEXT);
+        assert_eq!(text_element.text, Some("Default Text".to_string()));
+        assert_eq!(text_element.stroke_color, DEFAULT_STROKE_COLOR); // Should use default black
+    }
+
+    #[test]
+    fn test_generate_container_text_element_with_color() {
+        let text_color = Some("#00ff00".to_string());
+        let text_element = ExcalidrawGenerator::generate_container_text_element(
+            "Container Label",
+            50.0,
+            100.0,
+            "container_123",
+            16.0,
+            &None,
+            &text_color,
+        )
+        .unwrap();
+
+        assert_eq!(text_element.r#type, ELEMENT_TYPE_TEXT);
+        assert_eq!(text_element.text, Some("Container Label".to_string()));
+        assert_eq!(text_element.stroke_color, "#00ff00");
+        assert_eq!(text_element.text_align, Some(TEXT_ALIGN_LEFT.to_string()));
+        assert_eq!(
+            text_element.vertical_align,
+            Some(VERTICAL_ALIGN_TOP.to_string())
+        );
+    }
+
+    #[test]
+    fn test_node_with_text_color_generates_colored_text() {
+        let mut attributes = ExcalidrawAttributes::default();
+        attributes.text_color = Some("#ffffff".to_string());
+        attributes.background_color = Some("#000000".to_string());
+
+        let node_data = NodeData {
+            id: "colored_node".to_string(),
+            label: "White Text".to_string(),
+            attributes,
+            x: 100.0,
+            y: 100.0,
+            width: 120.0,
+            height: 60.0,
+            is_virtual_container: false,
+        };
+
+        let document = ParsedDocument {
+            config: GlobalConfig::default(),
+            component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
+            nodes: vec![NodeDefinition {
+                id: "colored_node".to_string(),
+                label: Some("White Text".to_string()),
+                component_type: None,
+                attributes: HashMap::new(),
+            }],
+            edges: vec![],
+            containers: vec![],
+            groups: vec![],
+            connections: vec![],
+        };
+
+        let mut igr = IntermediateGraph::from_ast(document).unwrap();
+
+        // Manually set the node data with color attributes
+        if let Some(node_idx) = igr.node_map.get("colored_node") {
+            igr.graph[*node_idx] = node_data;
+        }
+
+        let elements = ExcalidrawGenerator::generate(&igr).unwrap();
+
+        // Find the text element
+        let text_element = elements
+            .iter()
+            .find(|e| e.r#type == ELEMENT_TYPE_TEXT && e.text == Some("White Text".to_string()))
+            .expect("Should find text element");
+
+        assert_eq!(
+            text_element.stroke_color, "#ffffff",
+            "Text element should have white color"
+        );
+    }
+
+    #[test]
+    fn test_container_with_text_color() {
+        let mut container_attrs = ExcalidrawAttributes::default();
+        container_attrs.text_color = Some("#0000ff".to_string());
+
+        let container = ContainerData {
+            id: Some("container1".to_string()),
+            label: Some("Blue Text Container".to_string()),
+            children: vec![],
+            nested_containers: vec![],
+            nested_groups: vec![],
+            parent_container: None,
+            attributes: container_attrs,
+            bounds: Some(crate::igr::BoundingBox {
+                x: 10.0,
+                y: 10.0,
+                width: 200.0,
+                height: 150.0,
+            }),
+        };
+
+        let igr = IntermediateGraph {
+            graph: petgraph::graph::DiGraph::new(),
+            global_config: GlobalConfig::default(),
+            component_types: HashMap::new(),
+            containers: vec![container],
+            groups: vec![],
+            node_map: HashMap::new(),
+            container_map: HashMap::new(),
+        };
+
+        let elements = ExcalidrawGenerator::generate(&igr).unwrap();
+
+        // Should have container rectangle + container text label
+        assert_eq!(elements.len(), 2);
+
+        let text_element = elements
+            .iter()
+            .find(|e| e.r#type == ELEMENT_TYPE_TEXT)
+            .expect("Should find text element");
+
+        assert_eq!(
+            text_element.stroke_color, "#0000ff",
+            "Container text should have blue color"
+        );
+    }
+
+    #[test]
+    fn test_font_family_conversion() {
+        assert_eq!(ExcalidrawGenerator::convert_font_family(&None), 3);
+        assert_eq!(
+            ExcalidrawGenerator::convert_font_family(&Some("Virgil".to_string())),
+            1
+        );
+        assert_eq!(
+            ExcalidrawGenerator::convert_font_family(&Some("Helvetica".to_string())),
+            2
+        );
+        assert_eq!(
+            ExcalidrawGenerator::convert_font_family(&Some("Cascadia".to_string())),
+            3
+        );
+        assert_eq!(
+            ExcalidrawGenerator::convert_font_family(&Some("Code".to_string())),
+            3
+        );
+        assert_eq!(
+            ExcalidrawGenerator::convert_font_family(&Some("Unknown".to_string())),
+            3
+        );
+    }
+
+    #[test]
+    fn test_text_dimension_calculation() {
+        // Test with different font families
+        let (width1, height1) = ExcalidrawGenerator::calculate_text_dimensions("Hello", 20.0, 1);
+        let (width2, height2) = ExcalidrawGenerator::calculate_text_dimensions("Hello", 20.0, 3);
+
+        assert!(width1 > 0);
+        assert!(height1 > 0);
+        assert!(width2 > 0);
+        assert!(height2 > 0);
+
+        // Test with different text lengths
+        let (short_width, _) = ExcalidrawGenerator::calculate_text_dimensions("Hi", 20.0, 3);
+        let (long_width, _) =
+            ExcalidrawGenerator::calculate_text_dimensions("Hello World!", 20.0, 3);
+
+        assert!(
+            long_width > short_width,
+            "Longer text should have greater width"
+        );
+
+        // Test with special characters
+        let (narrow_width, _) = ExcalidrawGenerator::calculate_text_dimensions("iii", 20.0, 3);
+        let (wide_width, _) = ExcalidrawGenerator::calculate_text_dimensions("WWW", 20.0, 3);
+
+        assert!(
+            wide_width > narrow_width,
+            "Wide characters should have greater width"
+        );
+    }
 }

@@ -4,6 +4,7 @@ use crate::error::{BuildError, Result};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct IntermediateGraph {
     pub graph: DiGraph<NodeData, EdgeData>,
     pub global_config: GlobalConfig,
@@ -894,5 +895,168 @@ mod tests {
             result,
             Err(crate::error::EDSLError::Build(BuildError::DuplicateNode(_)))
         ));
+    }
+
+    #[test]
+    fn test_text_color_attribute_parsing() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "color".to_string(),
+            AttributeValue::String("#ffffff".to_string()),
+        );
+        attrs.insert(
+            "backgroundColor".to_string(),
+            AttributeValue::String("#000000".to_string()),
+        );
+        attrs.insert("fontSize".to_string(), AttributeValue::Number(20.0));
+
+        let excalidraw_attrs = ExcalidrawAttributes::from_hashmap(&attrs).unwrap();
+
+        assert_eq!(
+            excalidraw_attrs.text_color,
+            Some("#ffffff".to_string()),
+            "Text color should be parsed from 'color' attribute"
+        );
+        assert_eq!(
+            excalidraw_attrs.background_color,
+            Some("#000000".to_string())
+        );
+        assert_eq!(excalidraw_attrs.font_size, Some(20.0));
+    }
+
+    #[test]
+    fn test_text_color_in_node_data() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "color".to_string(),
+            AttributeValue::String("#ff0000".to_string()),
+        );
+
+        let document = ParsedDocument {
+            config: GlobalConfig::default(),
+            component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
+            nodes: vec![NodeDefinition {
+                id: "colored_node".to_string(),
+                label: Some("Red Text Node".to_string()),
+                component_type: None,
+                attributes: attrs,
+            }],
+            edges: vec![],
+            containers: vec![],
+            groups: vec![],
+            connections: vec![],
+        };
+
+        let igr = IntermediateGraph::from_ast(document).unwrap();
+        let node_idx = igr.node_map.get("colored_node").unwrap();
+        let node_data = &igr.graph[*node_idx];
+
+        assert_eq!(
+            node_data.attributes.text_color,
+            Some("#ff0000".to_string()),
+            "Node should have text color attribute"
+        );
+    }
+
+    #[test]
+    fn test_container_with_text_color() {
+        let mut container_attrs = HashMap::new();
+        container_attrs.insert(
+            "color".to_string(),
+            AttributeValue::String("#00ff00".to_string()),
+        );
+        container_attrs.insert(
+            "backgroundColor".to_string(),
+            AttributeValue::String("#f0f0f0".to_string()),
+        );
+
+        let document = ParsedDocument {
+            config: GlobalConfig::default(),
+            component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
+            nodes: vec![NodeDefinition {
+                id: "node1".to_string(),
+                label: Some("Node 1".to_string()),
+                component_type: None,
+                attributes: HashMap::new(),
+            }],
+            edges: vec![],
+            containers: vec![ContainerDefinition {
+                id: Some("test_container".to_string()),
+                label: Some("Test Container".to_string()),
+                children: vec!["node1".to_string()],
+                attributes: container_attrs,
+                internal_statements: vec![],
+            }],
+            groups: vec![],
+            connections: vec![],
+        };
+
+        let igr = IntermediateGraph::from_ast(document).unwrap();
+        assert_eq!(igr.containers.len(), 1);
+
+        let container = &igr.containers[0];
+        assert_eq!(
+            container.attributes.text_color,
+            Some("#00ff00".to_string()),
+            "Container should have text color attribute"
+        );
+    }
+
+    #[test]
+    fn test_group_with_text_color() {
+        let mut group_attrs = HashMap::new();
+        group_attrs.insert(
+            "color".to_string(),
+            AttributeValue::String("#0000ff".to_string()),
+        );
+
+        let document = ParsedDocument {
+            config: GlobalConfig::default(),
+            component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
+            nodes: vec![NodeDefinition {
+                id: "node1".to_string(),
+                label: Some("Node 1".to_string()),
+                component_type: None,
+                attributes: HashMap::new(),
+            }],
+            edges: vec![],
+            containers: vec![],
+            groups: vec![GroupDefinition {
+                id: "test_group".to_string(),
+                label: Some("Test Group".to_string()),
+                group_type: GroupType::BasicGroup,
+                children: vec!["node1".to_string()],
+                attributes: group_attrs,
+                internal_statements: vec![],
+            }],
+            connections: vec![],
+        };
+
+        let igr = IntermediateGraph::from_ast(document).unwrap();
+        assert_eq!(igr.groups.len(), 1);
+
+        let group = &igr.groups[0];
+        assert_eq!(
+            group.attributes.text_color,
+            Some("#0000ff".to_string()),
+            "Group should have text color attribute"
+        );
+    }
+
+    #[test]
+    fn test_missing_text_color_defaults() {
+        let attrs = HashMap::new(); // No color attribute
+
+        let excalidraw_attrs = ExcalidrawAttributes::from_hashmap(&attrs).unwrap();
+        assert_eq!(
+            excalidraw_attrs.text_color, None,
+            "Text color should be None when not specified"
+        );
     }
 }

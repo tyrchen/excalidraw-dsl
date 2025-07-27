@@ -20,6 +20,9 @@ pub mod llm;
 #[cfg(feature = "server")]
 pub mod server;
 
+#[cfg(test)]
+mod tests;
+
 pub use error::{EDSLError, Result};
 
 use crate::generator::ExcalidrawGenerator;
@@ -234,7 +237,7 @@ impl Default for EDSLCompiler {
 // Additional integration tests are located in tests/ directory
 
 #[cfg(test)]
-mod tests {
+mod lib_tests {
     use super::*;
     use petgraph::visit::IntoNodeReferences;
 
