@@ -19,6 +19,10 @@ export interface FileContentResponse {
   error?: string;
 }
 
+export interface StatesResponse {
+  directory: string;
+}
+
 export class FileService {
   private baseUrl: string;
 
@@ -97,6 +101,15 @@ export class FileService {
       }
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to save file');
+    }
+  }
+
+  async getStates(): Promise<StatesResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/states`);
+      return await response.json();
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to get application states');
     }
   }
 }

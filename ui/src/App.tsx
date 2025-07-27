@@ -12,14 +12,32 @@ function App() {
   const [showFileManager, setShowFileManager] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Initialize with a default file if no files exist
+  // Load default directory on startup
   useEffect(() => {
-    const { files, addFile, setCurrentFile } = useEDSLStore.getState();
+    const { files, addFile, setCurrentFile, clearFiles } = useEDSLStore.getState();
     
-    if (files.length === 0) {
-      const defaultFile = {
-        name: 'example.edsl',
-        content: `---
+    const loadDefaultDirectory = async () => {
+      try {
+        // Get default directory from server
+        const { fileService } = await import('./services/file-service');
+        const states = await fileService.getStates();
+        
+        // Load files from the default directory
+        const serverFiles = await fileService.loadFilesFromDirectory(states.directory);
+        
+        if (serverFiles.length > 0) {
+          // Clear existing files and load from server
+          clearFiles();
+          serverFiles.forEach(file => {
+            addFile(file);
+          });
+          setCurrentFile(serverFiles[0]);
+        } else {
+          // Fallback to default file if no server files found
+          if (files.length === 0) {
+            const defaultFile = {
+              name: 'example.edsl',
+              content: `---
 layout: dagre
 ---
 
@@ -28,12 +46,39 @@ start[Start] -> process[Process Data]
 process -> decision{Decision?}
 decision -> yes[Yes Path] -> end[End]
 decision -> no[No Path] -> process`,
-        lastModified: new Date(),
-      };
-      
-      addFile(defaultFile);
-      setCurrentFile(defaultFile);
-    }
+              lastModified: new Date(),
+            };
+            
+            addFile(defaultFile);
+            setCurrentFile(defaultFile);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load default directory:', error);
+        
+        // Fallback to default file on error
+        if (files.length === 0) {
+          const defaultFile = {
+            name: 'example.edsl',
+            content: `---
+layout: dagre
+---
+
+# Example EDSL Diagram
+start[Start] -> process[Process Data]
+process -> decision{Decision?}
+decision -> yes[Yes Path] -> end[End]
+decision -> no[No Path] -> process`,
+            lastModified: new Date(),
+          };
+          
+          addFile(defaultFile);
+          setCurrentFile(defaultFile);
+        }
+      }
+    };
+
+    loadDefaultDirectory();
   }, []);
 
   return (

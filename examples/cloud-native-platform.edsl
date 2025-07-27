@@ -1,5 +1,5 @@
 ---
-layout: dagre
+layout: elk
 direction: TB
 theme: light
 node_spacing: 120

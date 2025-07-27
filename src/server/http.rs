@@ -84,6 +84,11 @@ pub struct SaveFileResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StatesResponse {
+    pub directory: String,
+}
+
 /// Application state shared across handlers
 #[derive(Clone)]
 pub struct AppState {
@@ -138,6 +143,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/files", get(list_files_handler))
         .route("/api/file/{path}", get(get_file_content_handler))
         .route("/api/file/save", post(save_file_handler))
+        .route("/api/states", get(get_states_handler))
         .layer(
             ServiceBuilder::new()
                 // Add request body size limit (2MB)
@@ -452,6 +458,16 @@ async fn save_file_handler(Json(req): Json<SaveFileRequest>) -> Response {
     }
 }
 
+/// Get application states including default directory
+async fn get_states_handler() -> Response {
+    log::info!("Getting application states");
+
+    Json(StatesResponse {
+        directory: "examples".to_string(),
+    })
+    .into_response()
+}
+
 /// Start the HTTP server
 pub async fn start_server(port: u16, state: AppState) -> Result<()> {
     let app = create_router(state);
@@ -468,6 +484,7 @@ pub async fn start_server(port: u16, state: AppState) -> Result<()> {
     log::info!("  GET  http://localhost:{port}/api/files?path=<directory>");
     log::info!("  GET  http://localhost:{port}/api/file/<filepath>");
     log::info!("  POST http://localhost:{port}/api/file/save");
+    log::info!("  GET  http://localhost:{port}/api/states");
     log::info!("  WS   http://localhost:{port}/api/ws");
 
     axum::serve(listener, app).await.map_err(EDSLError::Io)?;
