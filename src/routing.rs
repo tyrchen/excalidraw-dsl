@@ -60,11 +60,9 @@ impl EdgeRouter {
         let target_max_y = target.y + target.height;
 
         // Check if nodes are more horizontally or vertically aligned
-        let horizontal_overlap = (source_max_x > target_min_x && source_min_x < target_max_x)
-            || (target_max_x > source_min_x && target_min_x < source_max_x);
+        let horizontal_overlap = source_max_x > target_min_x && source_min_x < target_max_x;
 
-        let vertical_overlap = (source_max_y > target_min_y && source_min_y < target_max_y)
-            || (target_max_y > source_min_y && target_min_y < source_max_y);
+        let vertical_overlap = source_max_y > target_min_y && source_min_y < target_max_y;
 
         let mut points = vec![[0, 0]];
 
