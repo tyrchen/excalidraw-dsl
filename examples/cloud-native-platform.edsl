@@ -1,0 +1,605 @@
+---
+layout: dagre
+direction: TB
+theme: light
+node_spacing: 120
+edge_spacing: 60
+---
+
+# Cloud-Native Application Platform
+# Complete Kubernetes-native architecture with service mesh, GitOps, and observability
+
+# Client Layer
+container "Client Applications" as clients {
+  style: {
+    backgroundColor: "#f0f9ff";
+    strokeColor: "#0ea5e9";
+    strokeWidth: 2;
+  }
+
+  web_client[Web Application] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+  }
+
+  mobile_client[Mobile App] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+  }
+
+  cli_client[CLI Tools] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+  }
+}
+
+# Edge/CDN Layer
+container "Edge & CDN" as edge {
+  style: {
+    backgroundColor: "#fef3c7";
+    strokeColor: "#f59e0b";
+    strokeWidth: 2;
+  }
+
+  cdn[CDN (CloudFlare)] {
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+  }
+
+  edge_cache[Edge Cache] {
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+  }
+
+  waf[Web Application Firewall] {
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+  }
+}
+
+# Ingress Layer (Kubernetes)
+container "Kubernetes Ingress" as k8s_ingress {
+  style: {
+    backgroundColor: "#f0fdf4";
+    strokeColor: "#16a34a";
+    strokeWidth: 2;
+  }
+
+  ingress_controller[NGINX Ingress Controller] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  cert_manager[Cert Manager] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  external_dns[External DNS] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+}
+
+# Service Mesh Layer
+container "Service Mesh (Istio)" as service_mesh {
+  style: {
+    backgroundColor: "#ede9fe";
+    strokeColor: "#8b5cf6";
+    strokeWidth: 2;
+  }
+
+  istio_gateway[Istio Gateway] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  envoy_proxy[Envoy Proxy] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  service_discovery[Service Discovery] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+}
+
+# Application Services
+container "Microservices Platform" as app_services {
+  style: {
+    backgroundColor: "#ecfdf5";
+    strokeColor: "#10b981";
+    strokeWidth: 2;
+  }
+
+  # API Gateway
+  api_gateway[API Gateway] {
+    backgroundColor: "#34d399";
+    strokeColor: "#059669";
+    fontSize: 16;
+    width: 140;
+  }
+
+  # Core Services
+  auth_service[Authentication Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  user_service[User Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  product_service[Product Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  order_service[Order Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  payment_service[Payment Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  notification_service[Notification Service] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  # Internal service connections
+  api_gateway -> auth_service: "AuthN/AuthZ" {
+    routing: orthogonal;
+  };
+  api_gateway -> user_service: "User Operations" {
+    routing: orthogonal;
+  };
+  api_gateway -> product_service: "Catalog" {
+    routing: orthogonal;
+  };
+  api_gateway -> order_service: "Orders" {
+    routing: orthogonal;
+  };
+  order_service -> payment_service: "Payment Processing" {
+    routing: orthogonal;
+  };
+  order_service -> notification_service: "Order Updates" {
+    routing: orthogonal;
+  };
+  payment_service -> notification_service: "Payment Confirmations" {
+    routing: orthogonal;
+  };
+}
+
+# Data Layer
+container "Data & Storage" as data_layer {
+  style: {
+    backgroundColor: "#fef3e2";
+    strokeColor: "#ea580c";
+    strokeWidth: 2;
+  }
+
+  # Databases
+  postgres_primary[PostgreSQL Primary] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  postgres_replica[PostgreSQL Replica] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  redis_cluster[Redis Cluster] {
+    shape: ellipse;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  elasticsearch[Elasticsearch] {
+    shape: ellipse;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  s3_storage[Object Storage (S3)] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  # Data connections
+  postgres_primary -> postgres_replica: "Replication" {
+    routing: orthogonal;
+  };
+}
+
+# Message Queuing
+container "Event Streaming" as messaging {
+  style: {
+    backgroundColor: "#f3e8ff";
+    strokeColor: "#7c3aed";
+    strokeWidth: 2;
+  }
+
+  kafka_cluster[Apache Kafka] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#7c3aed";
+    fontSize: 16;
+    width: 140;
+  }
+
+  schema_registry[Schema Registry] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#7c3aed";
+    fontSize: 14;
+  }
+
+  kafka_connect[Kafka Connect] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#7c3aed";
+    fontSize: 14;
+  }
+}
+
+# Observability Stack
+container "Observability Platform" as observability {
+  style: {
+    backgroundColor: "#fef2f2";
+    strokeColor: "#dc2626";
+    strokeWidth: 2;
+  }
+
+  # Metrics
+  prometheus[Prometheus] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  grafana[Grafana] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  # Logging
+  fluentd[Fluentd] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  # Tracing
+  jaeger[Jaeger] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  # Alerting
+  alertmanager[AlertManager] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  # Observability connections
+  prometheus -> grafana: "Metrics" {
+    routing: orthogonal;
+  };
+  prometheus -> alertmanager: "Alerts" {
+    routing: orthogonal;
+  };
+  fluentd -> elasticsearch: "Logs" {
+    routing: orthogonal;
+  };
+}
+
+# GitOps & CI/CD
+container "GitOps Pipeline" as gitops {
+  style: {
+    backgroundColor: "#f0f9ff";
+    strokeColor: "#2563eb";
+    strokeWidth: 2;
+  }
+
+  git_repo[Git Repository] {
+    backgroundColor: "#93c5fd";
+    strokeColor: "#2563eb";
+    fontSize: 14;
+  }
+
+  argocd[ArgoCD] {
+    backgroundColor: "#93c5fd";
+    strokeColor: "#2563eb";
+    fontSize: 14;
+  }
+
+  github_actions[GitHub Actions] {
+    backgroundColor: "#93c5fd";
+    strokeColor: "#2563eb";
+    fontSize: 14;
+  }
+
+  helm_charts[Helm Charts] {
+    backgroundColor: "#93c5fd";
+    strokeColor: "#2563eb";
+    fontSize: 14;
+  }
+
+  # GitOps flow
+  git_repo -> github_actions: "CI Trigger" {
+    routing: orthogonal;
+  };
+  github_actions -> helm_charts: "Build & Package" {
+    routing: orthogonal;
+  };
+  argocd -> git_repo: "Pull Config" {
+    routing: orthogonal;
+  };
+  argocd -> helm_charts: "Deploy" {
+    routing: orthogonal;
+  };
+}
+
+# External Services
+container "External Integrations" as external {
+  style: {
+    backgroundColor: "#f8fafc";
+    strokeColor: "#64748b";
+    strokeWidth: 2;
+    strokeStyle: dashed;
+  }
+
+  stripe_api[Stripe Payment API] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  sendgrid[SendGrid Email API] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  auth0[Auth0 Identity Provider] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  datadog[Datadog APM] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+}
+
+# Client to Edge connections
+web_client -> cdn: "HTTPS/2" {
+  routing: orthogonal;
+};
+mobile_client -> cdn: "HTTPS/2" {
+  routing: orthogonal;
+};
+cli_client -> cdn: "API Calls" {
+  routing: orthogonal;
+};
+
+# Edge to Kubernetes
+cdn -> waf: "Security Filtering" {
+  routing: orthogonal;
+};
+waf -> edge_cache: "Cached Content" {
+  routing: orthogonal;
+};
+edge_cache -> ingress_controller: "Dynamic Content" {
+  routing: orthogonal;
+};
+
+# Kubernetes Ingress
+ingress_controller -> istio_gateway: "TLS Termination" {
+  routing: orthogonal;
+};
+cert_manager -> ingress_controller: "SSL Certificates" {
+  routing: orthogonal;
+};
+external_dns -> ingress_controller: "DNS Management" {
+  routing: orthogonal;
+};
+
+# Service Mesh
+istio_gateway -> envoy_proxy: "Traffic Management" {
+  routing: orthogonal;
+};
+envoy_proxy -> service_discovery: "Service Location" {
+  routing: orthogonal;
+};
+service_discovery -> api_gateway: "Route to Services" {
+  routing: orthogonal;
+};
+
+# Data connections
+auth_service -> postgres_primary: "User Data" {
+  routing: orthogonal;
+};
+user_service -> postgres_primary: "Profile Data" {
+  routing: orthogonal;
+};
+product_service -> postgres_primary: "Catalog Data" {
+  routing: orthogonal;
+};
+order_service -> postgres_primary: "Order Data" {
+  routing: orthogonal;
+};
+payment_service -> postgres_primary: "Transaction Data" {
+  routing: orthogonal;
+};
+
+# Caching
+user_service -> redis_cluster: "Session Cache" {
+  routing: orthogonal;
+};
+product_service -> redis_cluster: "Catalog Cache" {
+  routing: orthogonal;
+};
+order_service -> redis_cluster: "Cart Cache" {
+  routing: orthogonal;
+};
+
+# Search
+product_service -> elasticsearch: "Product Search" {
+  routing: orthogonal;
+};
+
+# Object storage
+notification_service -> s3_storage: "Templates & Assets" {
+  routing: orthogonal;
+};
+
+# Event streaming
+order_service -> kafka_cluster: "Order Events" {
+  routing: orthogonal;
+};
+payment_service -> kafka_cluster: "Payment Events" {
+  routing: orthogonal;
+};
+notification_service -> kafka_cluster: "Notification Events" {
+  routing: orthogonal;
+};
+kafka_connect -> postgres_primary: "Change Data Capture" {
+  routing: orthogonal;
+};
+
+# External service connections
+payment_service -> stripe_api: "Payment Processing" {
+  routing: orthogonal;
+};
+notification_service -> sendgrid: "Email Delivery" {
+  routing: orthogonal;
+};
+auth_service -> auth0: "Identity Federation" {
+  routing: orthogonal;
+};
+
+# Observability connections
+api_gateway -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+auth_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+user_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+product_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+order_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+payment_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+notification_service -> prometheus: "Metrics" {
+  routing: orthogonal;
+};
+
+# Distributed tracing
+api_gateway -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+auth_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+user_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+product_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+order_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+payment_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+notification_service -> jaeger: "Traces" {
+  routing: orthogonal;
+};
+
+# Log aggregation
+api_gateway -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+auth_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+user_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+product_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+order_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+payment_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+notification_service -> fluentd: "Application Logs" {
+  routing: orthogonal;
+};
+
+# External monitoring
+prometheus -> datadog: "Metrics Export" {
+  routing: orthogonal;
+};
+jaeger -> datadog: "Trace Export" {
+  routing: orthogonal;
+};
+
+# GitOps deployment
+argocd -> ingress_controller: "Deploy Ingress" {
+  routing: orthogonal;
+};
+argocd -> istio_gateway: "Deploy Service Mesh" {
+  routing: orthogonal;
+};
+argocd -> api_gateway: "Deploy Applications" {
+  routing: orthogonal;
+};
+argocd -> prometheus: "Deploy Monitoring" {
+  routing: orthogonal;
+};

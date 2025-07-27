@@ -12,12 +12,12 @@ container "Frontend" as frontend {
     backgroundColor: "#e0f2fe";
     strokeStyle: dashed;
   }
-  
+
   web_app[Web Application] {
     backgroundColor: "#0ea5e9";
     strokeColor: "#0284c7";
   }
-  
+
   mobile_app[Mobile App] {
     backgroundColor: "#0ea5e9";
     strokeColor: "#0284c7";
@@ -39,44 +39,54 @@ container "Service Mesh" as services {
     strokeStyle: dashed;
     strokeColor: "#16a34a";
   }
-  
+
   # Core Services
   auth_service[Auth Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   user_service[User Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   order_service[Order Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   payment_service[Payment Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   inventory_service[Inventory Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   notification_service[Notification Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
-  
+
   # Internal connections
-  order_service -> payment_service: "process payment";
-  order_service -> inventory_service: "check stock";
-  payment_service -> notification_service: "send receipt";
-  order_service -> notification_service: "order updates";
-  auth_service -> user_service: "validate";
+  order_service -> payment_service: "process payment" {
+    routing: orthogonal;
+  };
+  order_service -> inventory_service: "check stock" {
+    routing: orthogonal;
+  };
+  payment_service -> notification_service: "send receipt" {
+    routing: orthogonal;
+  };
+  order_service -> notification_service: "order updates" {
+    routing: orthogonal;
+  };
+  auth_service -> user_service: "validate" {
+    routing: orthogonal;
+  };
 }
 
 # Data Layer
@@ -86,25 +96,25 @@ container "Data Layer" as data {
     strokeStyle: solid;
     strokeWidth: 2;
   }
-  
+
   user_db[User DB] {
     shape: cylinder;
     backgroundColor: "#fde047";
     strokeColor: "#facc15";
   }
-  
+
   order_db[Order DB] {
     shape: cylinder;
     backgroundColor: "#fde047";
     strokeColor: "#facc15";
   }
-  
+
   inventory_db[Inventory DB] {
     shape: cylinder;
     backgroundColor: "#fde047";
     strokeColor: "#facc15";
   }
-  
+
   cache[Redis Cache] {
     shape: ellipse;
     backgroundColor: "#ef4444";
@@ -126,17 +136,17 @@ container "External Services" as external {
     backgroundColor: "#fee2e2";
     strokeStyle: dotted;
   }
-  
+
   payment_gateway[Payment Gateway] {
     backgroundColor: "#fca5a5";
     strokeColor: "#f87171";
   }
-  
+
   email_provider[Email Provider] {
     backgroundColor: "#fca5a5";
     strokeColor: "#f87171";
   }
-  
+
   sms_provider[SMS Provider] {
     backgroundColor: "#fca5a5";
     strokeColor: "#f87171";
@@ -144,32 +154,72 @@ container "External Services" as external {
 }
 
 # Connections between layers
-web_app -> api_gateway;
-mobile_app -> api_gateway;
+web_app -> api_gateway {
+  routing: orthogonal;
+};
+mobile_app -> api_gateway {
+  routing: orthogonal;
+};
 
-api_gateway -> auth_service;
-api_gateway -> user_service;
-api_gateway -> order_service;
-api_gateway -> inventory_service;
+api_gateway -> auth_service {
+  routing: orthogonal;
+};
+api_gateway -> user_service {
+  routing: orthogonal;
+};
+api_gateway -> order_service {
+  routing: orthogonal;
+};
+api_gateway -> inventory_service {
+  routing: orthogonal;
+};
 
 # Service to database connections
-user_service -> user_db;
-auth_service -> user_db;
-order_service -> order_db;
-inventory_service -> inventory_db;
+user_service -> user_db {
+  routing: orthogonal;
+};
+auth_service -> user_db {
+  routing: orthogonal;
+};
+order_service -> order_db {
+  routing: orthogonal;
+};
+inventory_service -> inventory_db {
+  routing: orthogonal;
+};
 
 # Cache connections
-user_service -> cache: "cache user data";
-order_service -> cache: "cache orders";
-inventory_service -> cache: "cache stock";
+user_service -> cache: "cache user data" {
+  routing: orthogonal;
+};
+order_service -> cache: "cache orders" {
+  routing: orthogonal;
+};
+inventory_service -> cache: "cache stock" {
+  routing: orthogonal;
+};
 
 # Message queue connections
-order_service -> message_queue: "publish events";
-payment_service -> message_queue: "publish events";
-notification_service -- message_queue: "subscribe events";
-inventory_service -- message_queue: "subscribe events";
+order_service -> message_queue: "publish events" {
+  routing: orthogonal;
+};
+payment_service -> message_queue: "publish events" {
+  routing: orthogonal;
+};
+notification_service -- message_queue: "subscribe events" {
+  routing: orthogonal;
+};
+inventory_service -- message_queue: "subscribe events" {
+  routing: orthogonal;
+};
 
 # External service connections
-payment_service -> payment_gateway;
-notification_service -> email_provider;
-notification_service -> sms_provider;
+payment_service -> payment_gateway {
+  routing: orthogonal;
+};
+notification_service -> email_provider {
+  routing: orthogonal;
+};
+notification_service -> sms_provider {
+  routing: orthogonal;
+};

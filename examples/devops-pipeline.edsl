@@ -1,102 +1,459 @@
 ---
-layout: dagre
-direction: LR
-nodeSpacing: 80
-rankSpacing: 120
+layout: elk
+theme: light
+node_spacing: 120
+edge_spacing: 80
 ---
 
-# CI/CD Pipeline Architecture
-# DevOps pipeline with stages, tools, and deployment environments
+# Complete DevOps CI/CD Pipeline
+# Demonstrates modern DevOps practices with GitOps, Infrastructure as Code, and automated deployment
 
-# Developer Actions
-developer[Developer] {
-  shape: "ellipse";
-  strokeColor: "#3b82f6";
-  backgroundColor: "#dbeafe";
-  width: 120;
-  height: 80;
+# Developer Workflow
+container "Development Workflow" as dev_workflow {
+  style: {
+    backgroundColor: "#f0f9ff";
+    strokeColor: "#0ea5e9";
+    strokeWidth: 2;
+  }
+
+  developer[Developer] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+    shape: ellipse;
+  }
+
+  ide[IDE/Editor] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  local_git[Local Git] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  developer -> ide: "Code";
+  ide -> local_git: "Commit";
 }
 
-github[GitHub Repository] {
-  shape: "rectangle";
-  strokeColor: "#171717";
-  backgroundColor: "#f5f5f5";
-  width: 180;
-  height: 70;
+# Source Control
+container "Source Control" as source_control {
+  style: {
+    backgroundColor: "#fef3c7";
+    strokeColor: "#f59e0b";
+    strokeWidth: 2;
+  }
+
+  github[GitHub Repository] {
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+    width: 160;
+  }
+
+  feature_branch[Feature Branch] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  main_branch[Main Branch] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  pull_request[Pull Request] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  feature_branch -> pull_request: "Create PR";
+  pull_request -> main_branch: "Merge";
 }
 
-jenkins[Jenkins CI Server] {
-  shape: "rectangle";
-  strokeColor: "#d97706";
+# CI Pipeline
+container "Continuous Integration" as ci_pipeline {
+  style: {
+    backgroundColor: "#f0fdf4";
+    strokeColor: "#16a34a";
+    strokeWidth: 2;
+  }
+
+  github_actions[GitHub Actions] {
+    backgroundColor: "#16a34a";
+    strokeColor: "#15803d";
+    fontSize: 16;
+    width: 160;
+  }
+
+  # Build Stage
+  build_stage[Build Stage] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+    width: 120;
+  }
+
+  unit_tests[Unit Tests] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  integration_tests[Integration Tests] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  code_quality[Code Quality Checks] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+    width: 160;
+  }
+
+  security_scan[Security Scanning] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  docker_build[Docker Build] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  # CI Flow
+  github_actions -> build_stage;
+  build_stage -> unit_tests;
+  build_stage -> integration_tests;
+  build_stage -> code_quality;
+  build_stage -> security_scan;
+  unit_tests -> docker_build;
+  integration_tests -> docker_build;
+  code_quality -> docker_build;
+  security_scan -> docker_build;
+}
+
+# Artifact Storage
+container "Artifact Storage" as artifact_storage {
+  style: {
+    backgroundColor: "#fef3e2";
+    strokeColor: "#ea580c";
+    strokeWidth: 2;
+  }
+
+  registry[Container Registry] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 16;
+    shape: cylinder;
+    width: 160;
+  }
+
+  helm_repo[Helm Chart Repository] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+    shape: cylinder;
+  }
+
+  artifact_cache[Build Artifact Cache] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+}
+
+# Testing Environments
+container "Testing Environments" as testing_envs {
+  style: {
+    backgroundColor: "#f3e8ff";
+    strokeColor: "#7c3aed";
+    strokeWidth: 2;
+  }
+
+  dev_env[Development Environment] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 180;
+  }
+
+  staging_env[Staging Environment] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 180;
+  }
+
+  e2e_tests[End-to-End Tests] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  performance_tests[Performance Tests] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  staging_env -> e2e_tests;
+  staging_env -> performance_tests;
+}
+
+# Infrastructure as Code
+container "Infrastructure as Code" as iac {
+  style: {
+    backgroundColor: "#ecfdf5";
+    strokeColor: "#10b981";
+    strokeWidth: 2;
+  }
+
+  terraform[Terraform] {
+    backgroundColor: "#34d399";
+    strokeColor: "#059669";
+    fontSize: 16;
+    width: 120;
+  }
+
+  ansible[Ansible] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  helm_charts[Helm Charts] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  terraform -> ansible: "Provision";
+  ansible -> helm_charts: "Configure";
+}
+
+# GitOps
+container "GitOps Deployment" as gitops {
+  style: {
+    backgroundColor: "#ede9fe";
+    strokeColor: "#8b5cf6";
+    strokeWidth: 2;
+  }
+
+  argocd[ArgoCD] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 16;
+    width: 120;
+  }
+
+  flux[Flux] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  config_repo[Config Repository] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 140;
+  }
+
+  config_repo -> argocd: "Pull Config";
+  config_repo -> flux: "Watch Changes";
+}
+
+# Production Environments
+container "Production Environments" as production {
+  style: {
+    backgroundColor: "#fef2f2";
+    strokeColor: "#dc2626";
+    strokeWidth: 2;
+  }
+
+  # Kubernetes Clusters
+  prod_cluster[Production Cluster] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 16;
+    width: 160;
+  }
+
+  canary_cluster[Canary Cluster] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+    width: 160;
+  }
+
+  # Load Balancer
+  load_balancer[Load Balancer] {
+    backgroundColor: "#f87171";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+    width: 140;
+  }
+
+  load_balancer -> prod_cluster: "90% Traffic";
+  load_balancer -> canary_cluster: "10% Traffic";
+}
+
+# Monitoring & Observability
+container "Monitoring & Observability" as monitoring {
+  style: {
+    backgroundColor: "#f8fafc";
+    strokeColor: "#64748b";
+    strokeWidth: 2;
+  }
+
+  prometheus[Prometheus] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  grafana[Grafana] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  jaeger[Jaeger Tracing] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  elk_stack[ELK Stack] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  alertmanager[Alert Manager] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  prometheus -> grafana: "Metrics";
+  prometheus -> alertmanager: "Alerts";
+}
+
+# Security & Compliance
+container "Security & Compliance" as security {
+  style: {
+    backgroundColor: "#fefce8";
+    strokeColor: "#ca8a04";
+    strokeWidth: 2;
+  }
+
+  vault[HashiCorp Vault] {
+    backgroundColor: "#fde047";
+    strokeColor: "#ca8a04";
+    fontSize: 14;
+  }
+
+  policy_engine[Policy Engine (OPA)] {
+    backgroundColor: "#fde047";
+    strokeColor: "#ca8a04";
+    fontSize: 14;
+    width: 160;
+  }
+
+  compliance_check[Compliance Scanning] {
+    backgroundColor: "#fde047";
+    strokeColor: "#ca8a04";
+    fontSize: 14;
+    width: 160;
+  }
+
+  secrets_mgmt[Secrets Management] {
+    backgroundColor: "#fde047";
+    strokeColor: "#ca8a04";
+    fontSize: 14;
+    width: 160;
+  }
+
+  vault -> secrets_mgmt;
+}
+
+# External Services
+container "External Services" as external {
+  style: {
+    backgroundColor: "#f8fafc";
+    strokeColor: "#64748b";
+    strokeWidth: 2;
+    strokeStyle: dashed;
+  }
+
+  sonarqube[SonarQube] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  snyk[Snyk Security] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  datadog[Datadog] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  pagerduty[PagerDuty] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+}
+
+# Main Flow - Core Pipeline
+local_git -> github: "Push";
+github -> github_actions: "Trigger CI";
+docker_build -> registry: "Push Image";
+
+# Deployment Flow
+registry -> dev_env: "Deploy";
+dev_env -> staging_env: "Promote";
+argocd -> prod_cluster: "Deploy";
+
+# Infrastructure
+terraform -> prod_cluster: "Provision";
+
+# Essential Monitoring
+prod_cluster -> prometheus: "Metrics";
+
+# Pipeline Stages
+pipeline_stages[Pipeline Stages] {
   backgroundColor: "#fef3c7";
-  width: 170;
-  height: 70;
+  strokeColor: "#f59e0b";
+  fontSize: 12;
+  width: 200;
+  height: 120;
+  text: "1. Code Commit\n2. Build & Test\n3. Security Scan\n4. Package\n5. Deploy to Dev\n6. Deploy to Staging\n7. Run E2E Tests\n8. Deploy to Production";
 }
 
-buildstage[Build Stage] {
-  shape: "rectangle";
-  strokeColor: "#059669";
-  backgroundColor: "#d1fae5";
-  width: 140;
-  height: 60;
-}
-
-unittest[Unit Tests] {
-  shape: "diamond";
-  strokeColor: "#0891b2";
-  backgroundColor: "#cffafe";
-  width: 120;
-  height: 80;
-}
-
-dockerbuild[Docker Build] {
-  shape: "rectangle";
-  strokeColor: "#0ea5e9";
-  backgroundColor: "#e0f2fe";
-  width: 150;
-  height: 60;
-}
-
-devdeploy[Deploy to Dev] {
-  shape: "rectangle";
-  strokeColor: "#16a34a";
-  backgroundColor: "#dcfce7";
-  width: 140;
-  height: 60;
-}
-
-stagingdeploy[Deploy to Staging] {
-  shape: "rectangle";
-  strokeColor: "#ca8a04";
-  backgroundColor: "#fef9c3";
+# GitOps Benefits
+gitops_benefits[GitOps Benefits] {
+  backgroundColor: "#ede9fe";
+  strokeColor: "#8b5cf6";
+  fontSize: 12;
   width: 160;
-  height: 60;
+  height: 80;
+  text: "• Declarative\n• Version controlled\n• Automated sync\n• Audit trail";
 }
-
-proddeploy[Deploy to Production] {
-  shape: "rectangle";
-  strokeColor: "#059669";
-  backgroundColor: "#a7f3d0";
-  strokeWidth: 3;
-  width: 190;
-  height: 70;
-}
-
-monitoring[Monitoring] {
-  shape: "rectangle";
-  strokeColor: "#ea580c";
-  backgroundColor: "#fed7aa";
-  width: 140;
-  height: 60;
-}
-
-# Main pipeline flow
-developer -> github: Push Code
-github -> jenkins: Webhook Trigger
-jenkins -> buildstage: Start Build
-buildstage -> unittest: Run Tests
-unittest -> dockerbuild: Pass
-dockerbuild -> devdeploy: Build Complete
-devdeploy -> stagingdeploy: Auto-promote
-stagingdeploy -> proddeploy: Manual Approval
-proddeploy -> monitoring: Monitor

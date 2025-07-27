@@ -1,0 +1,362 @@
+---
+layout: force
+theme: light
+node_spacing: 100
+edge_spacing: 60
+---
+
+# Event-Driven E-commerce Platform
+# Demonstrates event sourcing, CQRS, and saga patterns for distributed transactions
+
+# Command Side (Write Model)
+container "Command Side (CQRS Write)" as command_side {
+  style: {
+    backgroundColor: "#f0f9ff";
+    strokeColor: "#0ea5e9";
+    strokeWidth: 2;
+  }
+
+  # API Gateway
+  api_gateway[API Gateway] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+    width: 140;
+  }
+
+  # Command Handlers
+  user_commands[User Command Handler] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  product_commands[Product Command Handler] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  order_commands[Order Command Handler] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  payment_commands[Payment Command Handler] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  inventory_commands[Inventory Command Handler] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  # Command routing
+  api_gateway -> user_commands: "User Commands";
+  api_gateway -> product_commands: "Product Commands";
+  api_gateway -> order_commands: "Order Commands";
+  api_gateway -> payment_commands: "Payment Commands";
+  api_gateway -> inventory_commands: "Inventory Commands";
+}
+
+# Event Store
+container "Event Store" as event_store {
+  style: {
+    backgroundColor: "#fef3c7";
+    strokeColor: "#f59e0b";
+    strokeWidth: 2;
+  }
+
+  event_db[Event Database] {
+    shape: cylinder;
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+    width: 160;
+  }
+
+  event_publisher[Event Publisher] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  event_db -> event_publisher: "Publish Events";
+}
+
+# Event Bus
+event_bus[Event Bus (Kafka)] {
+  backgroundColor: "#a855f7";
+  strokeColor: "#7c3aed";
+  fontSize: 16;
+  width: 180;
+  shape: ellipse;
+}
+
+# Query Side (Read Model)
+container "Query Side (CQRS Read)" as query_side {
+  style: {
+    backgroundColor: "#f0fdf4";
+    strokeColor: "#16a34a";
+    strokeWidth: 2;
+  }
+
+  # Event Handlers / Projections
+  user_projection[User View Projection] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  product_projection[Product View Projection] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  order_projection[Order View Projection] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  inventory_projection[Inventory View Projection] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  analytics_projection[Analytics Projection] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  # Query API
+  query_api[Query API] {
+    backgroundColor: "#16a34a";
+    strokeColor: "#15803d";
+    fontSize: 16;
+    width: 140;
+  }
+
+  # Projections to Query API
+  user_projection -> query_api;
+  product_projection -> query_api;
+  order_projection -> query_api;
+  inventory_projection -> query_api;
+  analytics_projection -> query_api;
+}
+
+# Read Model Databases
+container "Read Model Storage" as read_storage {
+  style: {
+    backgroundColor: "#fef3e2";
+    strokeColor: "#ea580c";
+    strokeWidth: 2;
+  }
+
+  user_view_db[User Views] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  product_view_db[Product Views] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  order_view_db[Order Views] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  inventory_view_db[Inventory Views] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  analytics_db[Analytics DB] {
+    shape: cylinder;
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  # Projections to databases
+  user_projection -> user_view_db;
+  product_projection -> product_view_db;
+  order_projection -> order_view_db;
+  inventory_projection -> inventory_view_db;
+  analytics_projection -> analytics_db;
+}
+
+# Saga Orchestrator
+container "Saga Orchestration" as saga_orchestrator {
+  style: {
+    backgroundColor: "#f3e8ff";
+    strokeColor: "#7c3aed";
+    strokeWidth: 2;
+  }
+
+  order_saga[Order Processing Saga] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 160;
+  }
+
+  payment_saga[Payment Processing Saga] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 160;
+  }
+
+  shipping_saga[Shipping Saga] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 160;
+  }
+
+  refund_saga[Refund Processing Saga] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 160;
+  }
+}
+
+# External Services
+container "External Services" as external_services {
+  style: {
+    backgroundColor: "#f8fafc";
+    strokeColor: "#64748b";
+    strokeWidth: 2;
+    strokeStyle: dashed;
+  }
+
+  payment_gateway[Payment Gateway] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  shipping_service[Shipping Service] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  email_service[Email Service] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  tax_service[Tax Calculation Service] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+}
+
+# Command Side to Event Store
+user_commands -> event_db: "User Events";
+product_commands -> event_db: "Product Events";
+order_commands -> event_db: "Order Events";
+payment_commands -> event_db: "Payment Events";
+inventory_commands -> event_db: "Inventory Events";
+
+# Event Store to Event Bus
+event_publisher -> event_bus: "Publish to Stream";
+
+# Event Bus to Query Side
+event_bus -> user_projection: "User Events";
+event_bus -> product_projection: "Product Events";
+event_bus -> order_projection: "Order Events";
+event_bus -> inventory_projection: "Inventory Events";
+event_bus -> analytics_projection: "All Events";
+
+# Event Bus to Saga Orchestrator
+event_bus -> order_saga: "Order Events";
+event_bus -> payment_saga: "Payment Events";
+event_bus -> shipping_saga: "Shipping Events";
+event_bus -> refund_saga: "Refund Events";
+
+# Saga to External Services
+payment_saga -> payment_gateway: "Process Payment";
+shipping_saga -> shipping_service: "Schedule Shipping";
+order_saga -> email_service: "Order Notifications";
+payment_saga -> tax_service: "Calculate Tax";
+
+# Saga to Command Side (Compensating Actions)
+order_saga -> order_commands: "Cancel Order";
+payment_saga -> payment_commands: "Refund Payment";
+order_saga -> inventory_commands: "Release Inventory";
+
+# External Services to Event Bus (via Saga)
+payment_gateway -> payment_saga: "Payment Result";
+shipping_service -> shipping_saga: "Shipping Status";
+tax_service -> payment_saga: "Tax Amount";
+
+# Saga publishes completion events
+order_saga -> event_bus: "Order Completed";
+payment_saga -> event_bus: "Payment Processed";
+shipping_saga -> event_bus: "Shipped";
+refund_saga -> event_bus: "Refund Completed";
+
+# Client interactions
+clients[Client Applications] {
+  backgroundColor: "#1e293b";
+  strokeColor: "#0f172a";
+  fontSize: 16;
+  textColor: "#ffffff";
+  width: 160;
+}
+
+clients -> api_gateway: "Commands (POST/PUT/DELETE)";
+clients -> query_api: "Queries (GET)";
+
+# Event Sourcing Example Flow
+events_example[Event Stream Example] {
+  backgroundColor: "#fef3c7";
+  strokeColor: "#f59e0b";
+  fontSize: 12;
+  width: 200;
+  height: 120;
+  text: "1. UserRegistered\n2. ProductAdded\n3. OrderCreated\n4. InventoryReserved\n5. PaymentInitiated\n6. PaymentCompleted\n7. OrderConfirmed\n8. ShippingScheduled";
+}
+
+# Saga Pattern Example
+saga_example[Order Saga Steps] {
+  backgroundColor: "#f3e8ff";
+  strokeColor: "#7c3aed";
+  fontSize: 12;
+  width: 180;
+  height: 100;
+  text: "1. Reserve Inventory\n2. Process Payment\n3. Confirm Order\n4. Schedule Shipping\n5. Send Notifications";
+}
+
+# CQRS Benefits
+cqrs_benefits[CQRS Benefits] {
+  backgroundColor: "#ecfdf5";
+  strokeColor: "#10b981";
+  fontSize: 12;
+  width: 160;
+  height: 80;
+  text: "• Scalable reads\n• Optimized queries\n• Independent models\n• Better performance";
+}

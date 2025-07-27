@@ -1,0 +1,435 @@
+---
+layout: force
+theme: light
+node_spacing: 100
+edge_spacing: 60
+---
+
+# Complete Observability Platform
+# Three Pillars of Observability: Metrics, Logs, and Traces with SLI/SLO monitoring
+
+# Application Layer
+container "Application Services" as app_services {
+  style: {
+    backgroundColor: "#f0f9ff";
+    strokeColor: "#0ea5e9";
+    strokeWidth: 2;
+  }
+
+  web_app[Web Application] {
+    backgroundColor: "#0ea5e9";
+    strokeColor: "#0284c7";
+    fontSize: 16;
+  }
+
+  api_service[API Service] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  background_service[Background Service] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  database[Database] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+    shape: cylinder;
+  }
+
+  message_queue[Message Queue] {
+    backgroundColor: "#7dd3fc";
+    strokeColor: "#0284c7";
+    fontSize: 14;
+  }
+
+  # Application connections
+  web_app -> api_service: "API Calls";
+  api_service -> database: "Queries";
+  api_service -> message_queue: "Async Tasks";
+  background_service -> message_queue: "Process Jobs";
+}
+
+# Metrics Collection (Pillar 1)
+container "Metrics Collection" as metrics {
+  style: {
+    backgroundColor: "#fef3c7";
+    strokeColor: "#f59e0b";
+    strokeWidth: 2;
+  }
+
+  prometheus[Prometheus] {
+    backgroundColor: "#fbbf24";
+    strokeColor: "#f59e0b";
+    fontSize: 16;
+    width: 140;
+  }
+
+  node_exporter[Node Exporter] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  cadvisor[cAdvisor] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+  }
+
+  app_metrics[Application Metrics] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+    width: 160;
+  }
+
+  blackbox_exporter[Blackbox Exporter] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#f59e0b";
+    fontSize: 14;
+    width: 160;
+  }
+
+  # Metrics flow
+  node_exporter -> prometheus: "System Metrics";
+  cadvisor -> prometheus: "Container Metrics";
+  app_metrics -> prometheus: "Custom Metrics";
+  blackbox_exporter -> prometheus: "Uptime/Latency";
+}
+
+# Logging Collection (Pillar 2)
+container "Logging Platform" as logging {
+  style: {
+    backgroundColor: "#f0fdf4";
+    strokeColor: "#16a34a";
+    strokeWidth: 2;
+  }
+
+  fluentd[Fluentd] {
+    backgroundColor: "#16a34a";
+    strokeColor: "#15803d";
+    fontSize: 16;
+    width: 120;
+  }
+
+  elasticsearch[Elasticsearch] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 16;
+    shape: cylinder;
+    width: 140;
+  }
+
+  logstash[Logstash] {
+    backgroundColor: "#86efac";
+    strokeColor: "#22c55e";
+    fontSize: 14;
+  }
+
+  filebeat[Filebeat] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  # Log processing pipeline
+  filebeat -> logstash: "Raw Logs";
+  fluentd -> logstash: "Structured Logs";
+  logstash -> elasticsearch: "Processed Logs";
+}
+
+# Distributed Tracing (Pillar 3)
+container "Distributed Tracing" as tracing {
+  style: {
+    backgroundColor: "#f3e8ff";
+    strokeColor: "#7c3aed";
+    strokeWidth: 2;
+  }
+
+  jaeger[Jaeger] {
+    backgroundColor: "#7c3aed";
+    strokeColor: "#6b21a8";
+    fontSize: 16;
+    width: 120;
+    color: "#ffffff";
+  }
+
+  jaeger_agent[Jaeger Agent] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+  }
+
+  jaeger_collector[Jaeger Collector] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 140;
+  }
+
+  jaeger_storage[Jaeger Storage] {
+    backgroundColor: "#c4b5fd";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    shape: cylinder;
+  }
+
+  opentelemetry[OpenTelemetry] {
+    backgroundColor: "#ddd6fe";
+    strokeColor: "#8b5cf6";
+    fontSize: 14;
+    width: 140;
+  }
+
+  # Tracing flow
+  opentelemetry -> jaeger_agent: "Spans";
+  jaeger_agent -> jaeger_collector: "Batch Spans";
+  jaeger_collector -> jaeger_storage: "Store Traces";
+  jaeger -> jaeger_storage: "Query Traces";
+}
+
+# Visualization & Dashboards
+container "Visualization Platform" as visualization {
+  style: {
+    backgroundColor: "#fef3e2";
+    strokeColor: "#ea580c";
+    strokeWidth: 2;
+  }
+
+  grafana[Grafana] {
+    backgroundColor: "#ea580c";
+    strokeColor: "#c2410c";
+    fontSize: 16;
+    width: 120;
+    color: "#ffffff";
+  }
+
+  kibana[Kibana] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+  }
+
+  custom_dashboards[Custom Dashboards] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+    width: 160;
+  }
+
+  business_metrics[Business Metrics] {
+    backgroundColor: "#fed7aa";
+    strokeColor: "#ea580c";
+    fontSize: 14;
+    width: 160;
+  }
+
+  # Dashboard connections
+  prometheus -> grafana: "Metrics Data";
+  elasticsearch -> kibana: "Log Data";
+  jaeger -> grafana: "Trace Metrics";
+  grafana -> custom_dashboards: "Technical Dashboards";
+  grafana -> business_metrics: "Business KPIs";
+}
+
+# Alerting & Incident Management
+container "Alerting Platform" as alerting {
+  style: {
+    backgroundColor: "#fef2f2";
+    strokeColor: "#dc2626";
+    strokeWidth: 2;
+  }
+
+  alertmanager[AlertManager] {
+    backgroundColor: "#dc2626";
+    strokeColor: "#b91c1c";
+    fontSize: 16;
+    width: 140;
+    color: "#ffffff";
+  }
+
+  pagerduty[PagerDuty] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  slack[Slack Integration] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  opsgenie[OpsGenie] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+  }
+
+  escalation_policy[Escalation Policy] {
+    backgroundColor: "#fca5a5";
+    strokeColor: "#dc2626";
+    fontSize: 14;
+    width: 160;
+  }
+
+  # Alert routing
+  prometheus -> alertmanager: "Alert Rules";
+  alertmanager -> pagerduty: "Critical Alerts";
+  alertmanager -> slack: "Warnings";
+  alertmanager -> opsgenie: "Incidents";
+  pagerduty -> escalation_policy: "Escalate";
+}
+
+# SLI/SLO Monitoring
+container "SLI/SLO Platform" as sli_slo {
+  style: {
+    backgroundColor: "#ecfdf5";
+    strokeColor: "#10b981";
+    strokeWidth: 2;
+  }
+
+  slo_manager[SLO Manager] {
+    backgroundColor: "#10b981";
+    strokeColor: "#047857";
+    fontSize: 16;
+    width: 140;
+    color: "#ffffff";
+  }
+
+  availability_sli[Availability SLI] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+    width: 140;
+  }
+
+  latency_sli[Latency SLI] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+  }
+
+  error_rate_sli[Error Rate SLI] {
+    backgroundColor: "#6ee7b7";
+    strokeColor: "#10b981";
+    fontSize: 14;
+    width: 140;
+  }
+
+  error_budget[Error Budget] {
+    backgroundColor: "#34d399";
+    strokeColor: "#059669";
+    fontSize: 14;
+  }
+
+  # SLI/SLO flow
+  prometheus -> availability_sli: "Uptime Metrics";
+  prometheus -> latency_sli: "Response Time";
+  prometheus -> error_rate_sli: "Error Metrics";
+  availability_sli -> slo_manager: "SLI Data";
+  latency_sli -> slo_manager: "SLI Data";
+  error_rate_sli -> slo_manager: "SLI Data";
+  slo_manager -> error_budget: "Budget Calculation";
+}
+
+# External Integrations
+container "External Services" as external {
+  style: {
+    backgroundColor: "#f8fafc";
+    strokeColor: "#64748b";
+    strokeWidth: 2;
+    strokeStyle: dashed;
+  }
+
+  datadog[Datadog] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  newrelic[New Relic] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  honeycomb[Honeycomb] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+
+  splunk[Splunk] {
+    backgroundColor: "#e2e8f0";
+    strokeColor: "#64748b";
+    fontSize: 14;
+  }
+}
+
+# Application to Observability
+web_app -> app_metrics: "Emit Metrics";
+api_service -> app_metrics: "Emit Metrics";
+background_service -> app_metrics: "Emit Metrics";
+
+web_app -> fluentd: "Application Logs";
+api_service -> fluentd: "Application Logs";
+background_service -> fluentd: "Application Logs";
+
+web_app -> opentelemetry: "Traces";
+api_service -> opentelemetry: "Traces";
+background_service -> opentelemetry: "Traces";
+
+# Infrastructure monitoring
+api_service -> node_exporter: "Host Metrics";
+database -> cadvisor: "Container Metrics";
+message_queue -> blackbox_exporter: "Health Checks";
+
+# Cross-platform integrations
+prometheus -> datadog: "Metrics Export";
+jaeger -> honeycomb: "Trace Export";
+elasticsearch -> splunk: "Log Export";
+alertmanager -> newrelic: "Alert Export";
+
+# SLO to alerting
+error_budget -> alertmanager: "Budget Alerts";
+slo_manager -> grafana: "SLO Dashboards";
+
+# Feedback loops
+alertmanager -> api_service: "Performance Alerts";
+slo_manager -> api_service: "SLO Violations";
+
+# Observability Benefits
+observability_benefits[Three Pillars Benefits] {
+  backgroundColor: "#f0f9ff";
+  strokeColor: "#0ea5e9";
+  fontSize: 12;
+  width: 180;
+  height: 100;
+  text: "Metrics: What's happening\nLogs: Why it's happening\nTraces: Where it's happening\nSLOs: Service reliability";
+}
+
+# SLI Examples
+sli_examples[SLI Examples] {
+  backgroundColor: "#ecfdf5";
+  strokeColor: "#10b981";
+  fontSize: 12;
+  width: 160;
+  height: 120;
+  text: "• Availability: 99.9%\n• Latency: p95 < 200ms\n• Error Rate: < 0.1%\n• Throughput: > 1000 RPS\n• Data Freshness: < 5min";
+}
+
+# Alert Hierarchy
+alert_hierarchy[Alert Severity] {
+  backgroundColor: "#fef2f2";
+  strokeColor: "#dc2626";
+  fontSize: 12;
+  width: 140;
+  height: 100;
+  text: "Critical: Page immediately\nHigh: Page during hours\nMedium: Slack notification\nLow: Dashboard only";
+}

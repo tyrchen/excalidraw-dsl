@@ -273,17 +273,15 @@ impl EdgeRouter {
     }
 
     /// Automatic routing - chooses the best algorithm based on node arrangement
-    fn auto_route(start: Point, end: Point, source: &NodeData, target: &NodeData) -> Vec<[i32; 2]> {
-        let dx = (end.0 - start.0).abs();
-        let dy = (end.1 - start.1).abs();
-
-        // Use orthogonal routing for connections that are mostly aligned
-        if dx < 50.0 || dy < 50.0 {
-            Self::orthogonal_route(start, end, source, target)
-        } else {
-            // Use straight line for diagonal connections
-            Self::straight_route(start, end)
-        }
+    fn auto_route(
+        start: Point,
+        end: Point,
+        _source: &NodeData,
+        _target: &NodeData,
+    ) -> Vec<[i32; 2]> {
+        // Default to straight line routing for all connections
+        // This provides cleaner, more readable diagrams by default
+        Self::straight_route(start, end)
     }
 
     /// Advanced routing with obstacle avoidance using A* pathfinding
