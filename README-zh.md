@@ -230,7 +230,7 @@ edsl input.edsl -o output.excalidraw --layout elk
 
 - 📖 **[教程](./tutorial/README-zh.md)** - 面向初学者的分步指南
 - 🌏 **[English Tutorial](./tutorial/README-en.md)** - 英文教程
-- 📝 **[语言参考](./docs/language-reference.md)** - 完整的语法参考
+- 📝 **[语言参考](./docs/language-reference-zh.md)** - 完整的语法参考
 - 🎨 **[示例](./examples/)** - 示例图表和模式
 - 🏗️ **[架构](./docs/architecture.md)** - 技术文档
 

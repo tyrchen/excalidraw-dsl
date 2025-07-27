@@ -611,7 +611,7 @@ vpn -> lb "安全连接" {
 ## 下一步
 
 - 在 `examples/` 目录中探索更多示例
-- 阅读[语言参考](../docs/language-reference.md)以了解完整语法
+- 阅读[语言参考](../docs/language-reference-zh.md)以了解完整语法
 - 加入我们的社区以获得支持和分享图表
 - 在 GitHub 上为项目做出贡献
 
