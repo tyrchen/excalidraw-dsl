@@ -1,0 +1,15 @@
+# Example 1: Basic Nodes and Edges
+# This example shows the most basic DSL features
+
+# Define nodes with labels
+start "Start Process"
+analyze "Analyze Data"
+decide "Make Decision"
+success "Success"
+failure "Failure"
+
+# Connect nodes with edges
+start -> analyze
+analyze -> decide
+decide -> success "Yes"
+decide -> failure "No"

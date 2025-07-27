@@ -1,0 +1,25 @@
+# Example 6: Edge Chains
+# Demonstrate various ways to create connected sequences
+
+# Simple chain
+step1 "Input Data" -> step2 "Validate" -> step3 "Process" -> step4 "Output"
+
+# Chain with labels
+start "Start" -> load "Load Data" -> transform "Transform" -> save "Save Results" -> end "Complete"
+
+# Branching chains
+main "Main Process"
+pathA "Path A"
+pathB "Path B"
+merge "Merge Results"
+
+# Create branches
+main -> pathA "Option 1"
+main -> pathB "Option 2"
+
+# Continue chains
+pathA -> processA1 "Step A1" -> processA2 "Step A2" -> merge
+pathB -> processB1 "Step B1" -> processB2 "Step B2" -> merge
+
+# Final step
+merge -> final "Final Output"

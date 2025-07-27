@@ -1,0 +1,107 @@
+---
+layout: dagre
+font: "Helvetica"
+component_types:
+  client:
+    backgroundColor: "#e8f5e9"
+    strokeColor: "#2e7d32"
+
+  server:
+    backgroundColor: "#e3f2fd"
+    strokeColor: "#1565c0"
+
+  storage:
+    backgroundColor: "#fff3e0"
+    strokeColor: "#e65100"
+    roundness: 2
+---
+
+# Example 7: Complex System Architecture
+
+# Client Layer
+container clients "Client Applications" {
+    web "Web App" @client
+    mobile "Mobile App" @client
+    desktop "Desktop App" @client
+}
+
+# API Gateway
+gateway "API Gateway" @server {
+    strokeWidth: 3
+}
+
+# Service Layer
+container services "Microservices" {
+    container core "Core Services" {
+        auth "Auth Service" @server
+        user "User Service" @server
+        product "Product Service" @server
+    }
+
+    container business "Business Services" {
+        order "Order Service" @server
+        payment "Payment Service" @server
+        shipping "Shipping Service" @server
+    }
+
+    container support "Support Services" {
+        notification "Notification" @server
+        analytics "Analytics" @server
+        reporting "Reporting" @server
+    }
+}
+
+# Data Layer
+container data "Data Storage" {
+    primary "Primary DB" @storage
+    replica "DB Replica" @storage
+    cache "Redis Cache" @storage
+    files "File Storage" @storage
+    search "Elasticsearch" @storage
+}
+
+# External Services
+container external "External Services" {
+    payment_gw "Payment Gateway"
+    email_service "Email Service"
+    sms_service "SMS Service"
+}
+
+# Client connections
+web -> gateway
+mobile -> gateway
+desktop -> gateway
+
+# Gateway to services
+gateway -> auth "/*"
+gateway -> user "/users/*"
+gateway -> product "/products/*"
+gateway -> order "/orders/*"
+gateway -> payment "/payments/*"
+
+# Service connections
+auth -> primary
+auth -> cache
+user -> primary
+user -> cache
+product -> primary
+product -> search
+
+order -> primary
+order -> user "Get User"
+order -> product "Get Product"
+
+payment -> primary
+payment -> payment_gw "Process"
+
+shipping -> primary
+shipping -> order "Get Order"
+
+notification -> email_service
+notification -> sms_service
+
+analytics -> replica
+reporting -> replica
+
+# Data replication
+primary -> replica "Sync"

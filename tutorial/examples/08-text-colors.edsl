@@ -1,0 +1,42 @@
+---
+# Example 8: Text Colors
+# Demonstrates the text color feature
+---
+
+# Nodes with different text colors
+red_text "Red Text" {
+    textColor: "#ff0000"
+    backgroundColor: "#ffe0e0"
+}
+
+blue_text "Blue Text" {
+    textColor: "#0000ff"
+    backgroundColor: "#e0e0ff"
+}
+
+green_text "Green Text" {
+    textColor: "#00ff00"
+    backgroundColor: "#e0ffe0"
+}
+
+white_on_black "White on Black" {
+    textColor: "#ffffff"
+    backgroundColor: "#000000"
+}
+
+# Container with colored text
+container styled "Styled Container" {
+    textColor: "#ff6b6b"
+    backgroundColor: "#fff5f5"
+
+    node1 "Inherits Container Style"
+    node2 "Custom Style" {
+        textColor: "#4c6ef5"
+        backgroundColor: "#f3f5ff"
+    }
+}
+
+# Connect them
+red_text -> blue_text -> green_text -> white_on_black
+
+node1 -> node2

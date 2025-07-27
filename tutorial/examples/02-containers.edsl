@@ -1,0 +1,26 @@
+# Example 2: Using Containers
+# Containers help organize related nodes
+
+container frontend "Frontend Application" {
+    ui "User Interface"
+    state "State Management"
+    router "Router"
+
+    # Internal connections
+    ui -> state
+    ui -> router
+}
+
+container backend "Backend Services" {
+    api "REST API"
+    auth "Authentication"
+    db "Database"
+
+    # Internal connections
+    api -> auth
+    api -> db
+    auth -> db
+}
+
+# External connections between containers
+ui -> api "HTTP Requests"

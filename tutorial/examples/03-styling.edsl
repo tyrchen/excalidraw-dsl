@@ -1,0 +1,49 @@
+---
+# Global configuration
+layout: dagre
+font: "Cascadia"
+---
+
+# Example 3: Styling Elements
+# This example demonstrates various styling options
+
+# Styled nodes
+primary "Primary Action" {
+    backgroundColor: "#4c6ef5"
+    textColor: "#ffffff"
+    strokeWidth: 2
+}
+
+secondary "Secondary Action" {
+    backgroundColor: "#868e96"
+    textColor: "#ffffff"
+    roughness: 0
+}
+
+success "Success State" {
+    backgroundColor: "#51cf66"
+    textColor: "#ffffff"
+    roundness: 3
+}
+
+error "Error State" {
+    backgroundColor: "#ff6b6b"
+    textColor: "#ffffff"
+    strokeColor: "#c92a2a"
+}
+
+# Styled edges
+primary -> secondary {
+    strokeWidth: 3
+    strokeColor: "#4c6ef5"
+}
+
+secondary -> success "Valid" {
+    strokeStyle: "solid"
+    strokeColor: "#51cf66"
+}
+
+secondary -> error "Invalid" {
+    strokeStyle: "dashed"
+    strokeColor: "#ff6b6b"
+}

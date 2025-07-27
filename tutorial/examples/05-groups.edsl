@@ -1,0 +1,35 @@
+# Example 5: Using Groups
+# Groups provide logical organization without visual boundaries
+
+# Development team
+group dev_team {
+    alice "Alice (Frontend)"
+    bob "Bob (Backend)"
+    charlie "Charlie (DevOps)"
+}
+
+# QA team
+group qa_team {
+    david "David (QA Lead)"
+    eve "Eve (Tester)"
+}
+
+# Tasks
+task1 "Feature A"
+task2 "Feature B"
+task3 "Bug Fix"
+task4 "Testing"
+task5 "Deployment"
+
+# Assignments
+alice -> task1
+bob -> task2
+charlie -> task5
+david -> task4
+eve -> task3
+
+# Dependencies
+task1 -> task4 "Ready for Testing"
+task2 -> task4 "Ready for Testing"
+task3 -> task4 "Verify Fix"
+task4 -> task5 "Testing Complete"

@@ -1,0 +1,58 @@
+---
+# Component types for consistent styling
+component_types:
+  service:
+    backgroundColor: "#e3f2fd"
+    strokeColor: "#1976d2"
+    roundness: 2
+
+  database:
+    backgroundColor: "#fce4ec"
+    strokeColor: "#c2185b"
+    roundness: 1
+
+  queue:
+    backgroundColor: "#f3e5f5"
+    strokeColor: "#7b1fa2"
+---
+
+# Example 4: Microservices Architecture
+
+# API Gateway
+gateway "API Gateway" @service
+
+# Microservices
+auth "Auth Service" @service
+user "User Service" @service
+order "Order Service" @service
+payment "Payment Service" @service
+notification "Notification Service" @service
+
+# Databases
+authDB "Auth DB" @database
+userDB "User DB" @database
+orderDB "Order DB" @database
+
+# Message Queue
+queue "Message Queue" @queue
+
+# Service connections
+gateway -> auth "Authenticate"
+gateway -> user "User APIs"
+gateway -> order "Order APIs"
+gateway -> payment "Payment APIs"
+
+# Database connections
+auth -> authDB
+user -> userDB
+order -> orderDB
+
+# Inter-service communication
+order -> payment "Process Payment"
+payment -> queue "Payment Events"
+order -> queue "Order Events"
+notification -> queue "Subscribe Events"
+
+# Service dependencies
+order -> user "Get User Info"
+payment -> user "Validate User"
