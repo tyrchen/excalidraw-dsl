@@ -1,6 +1,9 @@
 // src/layout/ml/tests.rs
 //! Tests for ML layout functionality
 
+// Include Phase 2 tests inline
+include!("phase2_tests.rs");
+
 #[cfg(test)]
 mod tests {
     use crate::ast::*;

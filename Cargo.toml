@@ -80,6 +80,7 @@ ndarray = { version = "0.16", optional = true }
 linfa = { version = "0.7", optional = true }
 linfa-trees = { version = "0.7", optional = true }
 linfa-clustering = { version = "0.7", optional = true }
+chrono = { version = "0.4", features = ["serde"], optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -107,6 +108,7 @@ ml-layout = [
   "linfa",
   "linfa-trees",
   "linfa-clustering",
+  "chrono",
 ]
 
 # Future layout engine integration

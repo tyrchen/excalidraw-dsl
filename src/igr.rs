@@ -4,7 +4,7 @@ use crate::error::{BuildError, Result};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntermediateGraph {
     pub graph: DiGraph<NodeData, EdgeData>,
     pub global_config: GlobalConfig,

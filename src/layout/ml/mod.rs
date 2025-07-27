@@ -10,9 +10,22 @@ mod selector;
 #[cfg(feature = "ml-layout")]
 mod training;
 
+// Phase 2 modules
+#[cfg(feature = "ml-layout")]
+mod constraints;
+#[cfg(feature = "ml-layout")]
+mod enhanced;
+#[cfg(feature = "ml-layout")]
+mod feedback;
+#[cfg(feature = "ml-layout")]
+mod gnn;
+#[cfg(feature = "ml-layout")]
+mod rl;
+
 #[cfg(all(test, feature = "ml-layout"))]
 mod tests;
 
+// Phase 1 exports
 #[cfg(feature = "ml-layout")]
 pub use features::{GraphFeatureExtractor, GraphFeatures};
 #[cfg(feature = "ml-layout")]
@@ -21,6 +34,20 @@ pub use model::{LayoutPredictionModel, ModelType, PerformanceMetrics, QualityMet
 pub use selector::{MLStrategySelector, StrategyPrediction};
 #[cfg(feature = "ml-layout")]
 pub use training::{TrainingData, TrainingDataCollector};
+
+// Phase 2 exports
+#[cfg(feature = "ml-layout")]
+pub use constraints::{
+    Axis, ConstraintSolution, Direction, LayoutConstraint, NeuralConstraintSolver,
+};
+#[cfg(feature = "ml-layout")]
+pub use enhanced::{EnhancedMLConfig, EnhancedMLLayoutBuilder, EnhancedMLLayoutStrategy};
+#[cfg(feature = "ml-layout")]
+pub use feedback::{FeedbackCollector, FeedbackSession, FeedbackType, OnlineModelUpdater};
+#[cfg(feature = "ml-layout")]
+pub use gnn::{GNNLayoutPredictor, LayoutPrediction};
+#[cfg(feature = "ml-layout")]
+pub use rl::{LayoutAction, LayoutEnvironment, LayoutState, RLLayoutOptimizer};
 
 use crate::error::Result;
 use crate::igr::IntermediateGraph;

@@ -10,7 +10,7 @@ use petgraph::visit::{EdgeRef, IntoNodeIdentifiers};
 use std::collections::HashMap;
 
 /// Features extracted from a graph for ML processing
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphFeatures {
     // Structural features
     pub node_count: usize,
@@ -330,7 +330,6 @@ impl GraphFeatureExtractor {
 
         let mut component_count = 0;
         let mut container_count = 0;
-        
 
         // Count based on node properties
         for node_weight in igr.graph.node_weights() {
