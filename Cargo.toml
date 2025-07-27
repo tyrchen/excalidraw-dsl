@@ -59,21 +59,21 @@ futures-util = { version = "0.3", optional = true }
 uuid = { version = "1.17", features = ["v4"] }
 
 # Random number generation
-rand = "0.8"
+rand = "0.9"
 
 # Logging
 log = "0.4"
 env_logger = "0.11"
 
-# File watching
-notify = "4.0"
+# File watching (updating to latest major version)
+notify = "8.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.20"
 
 [features]
-default = ["llm", "server"]
+default = ["llm", "server", "templates", "routing"]
 llm = ["reqwest", "tokio"]
 server = [
   "axum",
@@ -83,6 +83,9 @@ server = [
   "futures-util",
   "tokio",
 ]
+templates = []
+routing = []
+elk-layout = []
 
 # Future layout engine integration
 # Note: @antv/layout-rust is not available yet, so we'll implement a basic Dagre-like algorithm

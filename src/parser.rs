@@ -34,6 +34,8 @@ pub fn parse_edsl(input: &str) -> Result<ParsedDocument> {
 fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument> {
     let mut config = GlobalConfig::default();
     let mut component_types = HashMap::new();
+    let mut templates = HashMap::new();
+    let mut diagram = None;
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     let mut containers = Vec::new();
@@ -73,6 +75,20 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
                                 Rule::connections_def => {
                                     let conns = parse_connections(stmt_pair)?;
                                     connections.extend(conns);
+                                }
+                                Rule::template_def => {
+                                    let template = parse_template_definition(stmt_pair)?;
+                                    templates.insert(template.name.clone(), template);
+                                }
+                                Rule::diagram_def => {
+                                    if diagram.is_some() {
+                                        return Err(ParseError::ValidationError(
+                                            "Only one diagram definition is allowed per file"
+                                                .to_string(),
+                                        )
+                                        .into());
+                                    }
+                                    diagram = Some(parse_diagram_definition(stmt_pair)?);
                                 }
                                 _ => {
                                     log::warn!("Unknown statement rule: {:?}", stmt_pair.as_rule());
@@ -118,6 +134,8 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
     Ok(ParsedDocument {
         config,
         component_types,
+        templates,
+        diagram,
         nodes,
         edges,
         containers,
@@ -862,6 +880,294 @@ fn parse_connection_style(pair: pest::iterators::Pair<Rule>) -> Result<EdgeStyle
     }
 
     Ok(style)
+}
+
+fn parse_template_definition(pair: pest::iterators::Pair<Rule>) -> Result<TemplateDefinition> {
+    let mut name = String::new();
+    let mut layers = Vec::new();
+    let mut connections = None;
+    let mut layout = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::identifier => {
+                name = inner_pair.as_str().to_string();
+            }
+            Rule::template_body => {
+                for body_pair in inner_pair.into_inner() {
+                    match body_pair.as_rule() {
+                        Rule::layers_def => {
+                            for layer_pair in body_pair.into_inner() {
+                                if layer_pair.as_rule() == Rule::layer_def {
+                                    layers.push(parse_layer_definition(layer_pair)?);
+                                }
+                            }
+                        }
+                        Rule::connections_pattern => {
+                            connections = Some(parse_connection_pattern(body_pair)?);
+                        }
+                        Rule::layout_def => {
+                            layout = Some(parse_layout_definition(body_pair)?);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(TemplateDefinition {
+        name,
+        layers,
+        connections,
+        layout,
+    })
+}
+
+fn parse_layer_definition(pair: pest::iterators::Pair<Rule>) -> Result<LayerDefinition> {
+    let mut name = String::new();
+    let mut components = Vec::new();
+    let mut layout = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::string_literal => {
+                name = parse_string_literal(inner_pair.as_str())?;
+            }
+            Rule::layer_body => {
+                for body_pair in inner_pair.into_inner() {
+                    match body_pair.as_rule() {
+                        Rule::components_list => {
+                            for comp_pair in body_pair.into_inner() {
+                                if comp_pair.as_rule() == Rule::string_literal {
+                                    components.push(parse_string_literal(comp_pair.as_str())?);
+                                }
+                            }
+                        }
+                        Rule::layer_layout => {
+                            layout = Some(parse_layer_layout(body_pair)?);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(LayerDefinition {
+        name,
+        components,
+        layout,
+    })
+}
+
+fn parse_layer_layout(pair: pest::iterators::Pair<Rule>) -> Result<LayerLayout> {
+    let inner = pair.into_inner().next().unwrap();
+    match inner.as_str() {
+        "horizontal" => Ok(LayerLayout::Horizontal),
+        "vertical" => Ok(LayerLayout::Vertical),
+        layout_str if layout_str.starts_with("grid") => {
+            // Parse grid(n) format
+            let cols = layout_str
+                .strip_prefix("grid(")
+                .and_then(|s| s.strip_suffix(")"))
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(2);
+            Ok(LayerLayout::Grid { cols })
+        }
+        _ => Ok(LayerLayout::Horizontal),
+    }
+}
+
+fn parse_connection_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ConnectionPattern> {
+    let inner = pair.into_inner().next().unwrap();
+    match inner.as_str() {
+        "each-to-next-layer" => Ok(ConnectionPattern::EachToNextLayer),
+        "mesh" => Ok(ConnectionPattern::Mesh),
+        pattern if pattern.starts_with("star(") => {
+            let center = pattern
+                .strip_prefix("star(")
+                .and_then(|s| s.strip_suffix(")"))
+                .unwrap_or("center")
+                .to_string();
+            Ok(ConnectionPattern::Star(center))
+        }
+        _ => Ok(ConnectionPattern::EachToNextLayer),
+    }
+}
+
+fn parse_diagram_definition(pair: pest::iterators::Pair<Rule>) -> Result<DiagramDefinition> {
+    let mut name = String::new();
+    let mut diagram_type = DiagramType::Flow;
+    let mut layout = None;
+    let mut template = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::string_literal => {
+                name = parse_string_literal(inner_pair.as_str())?;
+            }
+            Rule::diagram_body => {
+                for body_pair in inner_pair.into_inner() {
+                    match body_pair.as_rule() {
+                        Rule::diagram_type => {
+                            diagram_type = parse_diagram_type(body_pair)?;
+                        }
+                        Rule::layout_def => {
+                            layout = Some(parse_layout_definition(body_pair)?);
+                        }
+                        Rule::template_ref => {
+                            template =
+                                Some(body_pair.into_inner().next().unwrap().as_str().to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(DiagramDefinition {
+        name,
+        diagram_type,
+        layout,
+        template,
+    })
+}
+
+fn parse_diagram_type(pair: pest::iterators::Pair<Rule>) -> Result<DiagramType> {
+    let type_name = pair.into_inner().next().unwrap().as_str();
+    match type_name {
+        "architecture" => Ok(DiagramType::Architecture),
+        "flow" => Ok(DiagramType::Flow),
+        "sequence" => Ok(DiagramType::Sequence),
+        "network" => Ok(DiagramType::Network),
+        "database" => Ok(DiagramType::Database),
+        custom => Ok(DiagramType::Custom(custom.to_string())),
+    }
+}
+
+fn parse_layout_definition(pair: pest::iterators::Pair<Rule>) -> Result<LayoutDefinition> {
+    let mut layout_type = LayoutType::Layered;
+    let mut direction = None;
+    let mut spacing = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::layout_type => {
+                layout_type = parse_layout_type(inner_pair)?;
+            }
+            Rule::layout_direction => {
+                direction = Some(parse_layout_direction(inner_pair)?);
+            }
+            Rule::layout_spacing_def => {
+                spacing = Some(parse_layout_spacing(inner_pair)?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(LayoutDefinition {
+        layout_type,
+        direction,
+        spacing,
+    })
+}
+
+fn parse_layout_type(pair: pest::iterators::Pair<Rule>) -> Result<LayoutType> {
+    let type_name = pair.into_inner().next().unwrap().as_str();
+    match type_name {
+        "layered" => Ok(LayoutType::Layered),
+        "force" => Ok(LayoutType::Force),
+        "grid" => Ok(LayoutType::Grid),
+        "tree" => Ok(LayoutType::Tree),
+        "manual" => Ok(LayoutType::Manual),
+        _ => Ok(LayoutType::Layered),
+    }
+}
+
+fn parse_layout_direction(pair: pest::iterators::Pair<Rule>) -> Result<LayoutDirection> {
+    let direction_name = pair.into_inner().next().unwrap().as_str();
+    match direction_name {
+        "horizontal" => Ok(LayoutDirection::Horizontal),
+        "vertical" => Ok(LayoutDirection::Vertical),
+        "top-to-bottom" => Ok(LayoutDirection::TopToBottom),
+        "bottom-to-top" => Ok(LayoutDirection::BottomToTop),
+        "left-to-right" => Ok(LayoutDirection::LeftToRight),
+        "right-to-left" => Ok(LayoutDirection::RightToLeft),
+        _ => Ok(LayoutDirection::TopToBottom),
+    }
+}
+
+fn parse_layout_spacing(pair: pest::iterators::Pair<Rule>) -> Result<LayoutSpacing> {
+    let mut x = None;
+    let mut y = None;
+    let mut node_spacing = None;
+    let mut layer_spacing = None;
+
+    for inner_pair in pair.into_inner() {
+        if inner_pair.as_rule() == Rule::spacing_params {
+            for spacing_pair in inner_pair.into_inner() {
+                match spacing_pair.as_rule() {
+                    Rule::spacing_x => {
+                        x = Some(
+                            spacing_pair
+                                .into_inner()
+                                .next()
+                                .unwrap()
+                                .as_str()
+                                .parse::<f64>()
+                                .unwrap_or(50.0),
+                        );
+                    }
+                    Rule::spacing_y => {
+                        y = Some(
+                            spacing_pair
+                                .into_inner()
+                                .next()
+                                .unwrap()
+                                .as_str()
+                                .parse::<f64>()
+                                .unwrap_or(50.0),
+                        );
+                    }
+                    Rule::node_spacing => {
+                        node_spacing = Some(
+                            spacing_pair
+                                .into_inner()
+                                .next()
+                                .unwrap()
+                                .as_str()
+                                .parse::<f64>()
+                                .unwrap_or(30.0),
+                        );
+                    }
+                    Rule::layer_spacing => {
+                        layer_spacing = Some(
+                            spacing_pair
+                                .into_inner()
+                                .next()
+                                .unwrap()
+                                .as_str()
+                                .parse::<f64>()
+                                .unwrap_or(100.0),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(LayoutSpacing {
+        x,
+        y,
+        node_spacing,
+        layer_spacing,
+    })
 }
 
 #[cfg(test)]

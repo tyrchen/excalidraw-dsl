@@ -8,7 +8,11 @@ pub mod generator;
 pub mod igr;
 pub mod layout;
 pub mod parser;
+#[cfg(feature = "routing")]
 pub mod routing;
+
+#[cfg(feature = "templates")]
+pub mod template;
 
 #[cfg(feature = "llm")]
 pub mod llm;
@@ -22,6 +26,9 @@ use crate::generator::ExcalidrawGenerator;
 use crate::igr::IntermediateGraph;
 use crate::layout::LayoutManager;
 use crate::parser::parse_edsl;
+
+#[cfg(feature = "templates")]
+use crate::template::TemplateProcessor;
 
 /// The main EDSL compiler that orchestrates parsing, layout, and generation
 pub struct EDSLCompiler {
@@ -40,6 +47,23 @@ impl EDSLCompiler {
         }
     }
 
+    /// Process templates if the feature is enabled
+    fn process_templates(
+        &self,
+        parsed_doc: crate::ast::ParsedDocument,
+    ) -> Result<crate::ast::ParsedDocument> {
+        #[cfg(feature = "templates")]
+        {
+            let template_processor = TemplateProcessor::new();
+            template_processor.process_document(parsed_doc)
+        }
+
+        #[cfg(not(feature = "templates"))]
+        {
+            Ok(parsed_doc)
+        }
+    }
+
     /// Enable LLM layout optimization with the provided API key
     #[cfg(feature = "llm")]
     pub fn with_llm_optimization(mut self, api_key: String) -> Self {
@@ -52,8 +76,11 @@ impl EDSLCompiler {
         // Parse EDSL
         let parsed_doc = parse_edsl(edsl_source)?;
 
+        // Process templates if present
+        let processed_doc = self.process_templates(parsed_doc)?;
+
         // Build intermediate graph representation
-        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+        let mut igr = IntermediateGraph::from_ast(processed_doc)?;
 
         // Apply layout algorithms
         self.layout_manager.layout(&mut igr)?;
@@ -77,7 +104,8 @@ impl EDSLCompiler {
         edsl_source: &str,
     ) -> Result<Vec<generator::ExcalidrawElementSkeleton>> {
         let parsed_doc = parse_edsl(edsl_source)?;
-        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+        let processed_doc = self.process_templates(parsed_doc)?;
+        let mut igr = IntermediateGraph::from_ast(processed_doc)?;
 
         self.layout_manager.layout(&mut igr)?;
 
@@ -92,7 +120,8 @@ impl EDSLCompiler {
     /// Parse and validate EDSL source code without generating output
     pub fn validate(&self, edsl_source: &str) -> Result<()> {
         let parsed_doc = parse_edsl(edsl_source)?;
-        let _igr = IntermediateGraph::from_ast(parsed_doc)?;
+        let processed_doc = self.process_templates(parsed_doc)?;
+        let _igr = IntermediateGraph::from_ast(processed_doc)?;
         Ok(())
     }
 
@@ -189,7 +218,8 @@ impl EDSLCompiler {
     /// Get the intermediate graph representation for debugging/inspection
     pub fn get_igr(&self, edsl_source: &str) -> Result<IntermediateGraph> {
         let parsed_doc = parse_edsl(edsl_source)?;
-        let mut igr = IntermediateGraph::from_ast(parsed_doc)?;
+        let processed_doc = self.process_templates(parsed_doc)?;
+        let mut igr = IntermediateGraph::from_ast(processed_doc)?;
         self.layout_manager.layout(&mut igr)?;
         Ok(igr)
     }

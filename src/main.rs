@@ -393,9 +393,8 @@ struct WatchArgs {
 }
 
 fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
-    use notify::{DebouncedEvent, RecursiveMode, Watcher};
+    use notify::{Event, EventKind, RecursiveMode, Watcher};
     use std::sync::mpsc::channel;
-    use std::time::Duration;
 
     // Determine output path
     let output_path = args.output.unwrap_or_else(|| {
@@ -413,8 +412,16 @@ fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
     // Create a channel to receive the events
     let (tx, rx) = channel();
 
-    // Create a watcher object, delivering debounced events
-    let mut watcher = notify::watcher(tx, Duration::from_millis(500))?;
+    // Create a watcher object with debounced events
+    let mut watcher =
+        notify::recommended_watcher(move |res: Result<Event, notify::Error>| match res {
+            Ok(event) => {
+                if let Err(e) = tx.send(event) {
+                    eprintln!("Error sending watch event: {e}");
+                }
+            }
+            Err(e) => eprintln!("Watch error: {e:?}"),
+        })?;
 
     // Add a path to be watched
     watcher.watch(&args.input, RecursiveMode::NonRecursive)?;
@@ -422,15 +429,15 @@ fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
     // Main watch loop
     loop {
         match rx.recv() {
-            Ok(event) => match event {
-                DebouncedEvent::Write(_) | DebouncedEvent::Create(_) => {
+            Ok(event) => match event.kind {
+                EventKind::Modify(_) | EventKind::Create(_) => {
                     println!("\n📝 File changed, recompiling...");
                     match compile_file(&args.input, &output_path, args.verbose) {
                         Ok(_) => println!("✓ Compilation successful"),
                         Err(e) => eprintln!("✗ Compilation failed: {e}"),
                     }
                 }
-                DebouncedEvent::Remove(_) => {
+                EventKind::Remove(_) => {
                     eprintln!("⚠️  Input file was removed");
                 }
                 _ => {}

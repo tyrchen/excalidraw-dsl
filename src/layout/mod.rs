@@ -34,6 +34,8 @@ mod tests {
                 ..Default::default()
             },
             component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),

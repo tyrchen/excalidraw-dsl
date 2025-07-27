@@ -201,6 +201,8 @@ impl GlobalConfigBuilder {
 pub struct ParsedDocument {
     pub config: GlobalConfig,
     pub component_types: HashMap<String, ComponentTypeDefinition>,
+    pub templates: HashMap<String, TemplateDefinition>,
+    pub diagram: Option<DiagramDefinition>,
     pub nodes: Vec<NodeDefinition>,
     pub edges: Vec<EdgeDefinition>,
     pub containers: Vec<ContainerDefinition>,
@@ -226,6 +228,98 @@ pub struct StyleDefinition {
     pub roughness: Option<u8>,
     pub font_size: Option<f64>,
     pub font: Option<String>,
+}
+
+/// Template definition for reusable diagram patterns
+#[derive(Debug, Clone)]
+pub struct TemplateDefinition {
+    pub name: String,
+    pub layers: Vec<LayerDefinition>,
+    pub connections: Option<ConnectionPattern>,
+    pub layout: Option<LayoutDefinition>,
+}
+
+/// Layer definition within a template
+#[derive(Debug, Clone)]
+pub struct LayerDefinition {
+    pub name: String,
+    pub components: Vec<String>,
+    pub layout: Option<LayerLayout>,
+}
+
+/// Connection patterns for templates
+#[derive(Debug, Clone)]
+pub enum ConnectionPattern {
+    EachToNextLayer,
+    Star(String), // Central component name
+    Mesh,
+    Custom(Vec<(String, String)>),
+}
+
+/// Layer layout options
+#[derive(Debug, Clone)]
+pub enum LayerLayout {
+    Horizontal,
+    Vertical,
+    Grid { cols: usize },
+}
+
+/// Diagram definition with specific type and configuration
+#[derive(Debug, Clone)]
+pub struct DiagramDefinition {
+    pub name: String,
+    pub diagram_type: DiagramType,
+    pub layout: Option<LayoutDefinition>,
+    pub template: Option<String>, // Reference to template
+}
+
+/// Types of diagrams with specific behaviors
+#[derive(Debug, Clone)]
+pub enum DiagramType {
+    Architecture,
+    Flow,
+    Sequence,
+    Network,
+    Database,
+    Custom(String),
+}
+
+/// Layout configuration for diagrams
+#[derive(Debug, Clone)]
+pub struct LayoutDefinition {
+    pub layout_type: LayoutType,
+    pub direction: Option<LayoutDirection>,
+    pub spacing: Option<LayoutSpacing>,
+}
+
+/// Layout algorithm types
+#[derive(Debug, Clone)]
+pub enum LayoutType {
+    Layered,
+    Force,
+    Grid,
+    Tree,
+    Manual,
+}
+
+/// Layout direction
+#[derive(Debug, Clone)]
+pub enum LayoutDirection {
+    Horizontal,
+    Vertical,
+    TopToBottom,
+    BottomToTop,
+    LeftToRight,
+    RightToLeft,
+}
+
+/// Layout spacing configuration
+#[derive(Debug, Clone)]
+pub struct LayoutSpacing {
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub node_spacing: Option<f64>,
+    pub layer_spacing: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -332,6 +426,8 @@ pub enum Statement {
     Container(ContainerDefinition),
     Group(GroupDefinition),
     Connection(ConnectionDefinition),
+    Template(TemplateDefinition),
+    Diagram(DiagramDefinition),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

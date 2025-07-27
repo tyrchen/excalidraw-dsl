@@ -320,6 +320,12 @@ impl IntermediateGraph {
                     Statement::Connection(_) => {
                         // Connections are handled separately
                     }
+                    Statement::Template(_) => {
+                        // Templates are handled at the document level
+                    }
+                    Statement::Diagram(_) => {
+                        // Diagrams are handled at the document level
+                    }
                 }
             }
         }
@@ -353,6 +359,12 @@ impl IntermediateGraph {
                     }
                     Statement::Connection(_) => {
                         // Connections are handled separately
+                    }
+                    Statement::Template(_) => {
+                        // Templates are handled at the document level
+                    }
+                    Statement::Diagram(_) => {
+                        // Diagrams are handled at the document level
                     }
                 }
             }
@@ -765,6 +777,8 @@ mod tests {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
             component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),
@@ -804,6 +818,8 @@ mod tests {
         let document = ParsedDocument {
             config: GlobalConfig::default(),
             component_types: HashMap::new(),
+            templates: HashMap::new(),
+            diagram: None,
             nodes: vec![
                 NodeDefinition {
                     id: "a".to_string(),

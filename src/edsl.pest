@@ -9,21 +9,23 @@ config = { "---" ~ yaml_content ~ "---" }
 yaml_content = { (!"---" ~ ANY)* }
 
 // Main statements
-statement = { 
-    (connection_def | 
-     connections_def | 
-     component_type_def | 
-     container_def | 
-     group_def | 
-     edge_def | 
+statement = {
+    (template_def |
+     diagram_def |
+     connection_def |
+     connections_def |
+     component_type_def |
+     container_def |
+     group_def |
+     edge_def |
      node_def
-    ) ~ ";"? 
+    ) ~ ";"?
 }
 
 // Component type definitions
 component_type_def = {
-  "componentType" ~ id ~ "{" ~ 
-  component_type_style ~ 
+  "componentType" ~ id ~ "{" ~
+  component_type_style ~
   "}"
 }
 component_type_style = {
@@ -38,7 +40,7 @@ type_ref = { "{" ~ "type" ~ ":" ~ id ~ "}" }
 label = { "[" ~ label_text ~ "]" }
 label_text = @{ (!"[" ~ !"]" ~ !"\"" ~ !NEWLINE ~ ANY)+ }
 
-// Edge definitions  
+// Edge definitions
 edge_def = { edge_chain | single_edge }
 edge_chain = { node_ref ~ (arrow ~ node_ref)+ ~ edge_label? ~ style_block? }
 single_edge = { node_ref ~ arrow ~ node_ref ~ edge_label? ~ style_block? }
@@ -87,24 +89,104 @@ routing_type = { "straight" | "orthogonal" | "curved" | "auto" }
 stroke_style = { "solid" | "dashed" | "dotted" }
 
 // Container definitions
-container_def = { 
-  "container" ~ string_literal? ~ ("as" ~ id)? ~ "{" ~ 
-  container_style? ~ 
-  statement* ~ 
-  "}" 
+container_def = {
+  "container" ~ string_literal? ~ ("as" ~ id)? ~ "{" ~
+  container_style? ~
+  statement* ~
+  "}"
 }
 container_style = { "style:" ~ style_block }
 
 // Group definitions
-group_def = { 
-  group_type ~ string_literal ~ ("as" ~ id)? ~ "{" ~ 
-  group_style? ~ 
-  statement* ~ 
-  "}" 
+group_def = {
+  group_type ~ string_literal ~ ("as" ~ id)? ~ "{" ~
+  group_style? ~
+  statement* ~
+  "}"
 }
 group_type = { "group" | "flow" | semantic_group_type }
 semantic_group_type = { "service" | "layer" | "component" | "subsystem" | "zone" | "cluster" }
 group_style = { "style:" ~ style_block }
+
+// Template definitions
+template_def = {
+  "template" ~ identifier ~ "{" ~
+  template_body ~
+  "}"
+}
+template_body = {
+  (layers_def | connections_pattern | layout_def)*
+}
+layers_def = {
+  "layers" ~ "{" ~ layer_def* ~ "}"
+}
+layer_def = {
+  string_literal ~ "{" ~ layer_body ~ "}"
+}
+layer_body = {
+  (components_list | layer_layout)*
+}
+components_list = {
+  "components:" ~ "[" ~ (string_literal ~ ("," ~ string_literal)*)? ~ "]"
+}
+layer_layout = {
+  "layout:" ~ (layout_type | layer_layout_type)
+}
+layer_layout_type = { "horizontal" | "vertical" | ("grid(" ~ number ~ ")") }
+
+connections_pattern = {
+  "connections" ~ "{" ~
+  "pattern:" ~ connection_pattern_type ~
+  "}"
+}
+connection_pattern_type = {
+  "each-to-next-layer" |
+  "mesh" |
+  ("star(" ~ string_literal ~ ")") |
+  "custom"
+}
+
+// Diagram definitions
+diagram_def = {
+  "diagram" ~ string_literal ~ "{" ~
+  diagram_body ~
+  "}"
+}
+diagram_body = {
+  (diagram_type | layout_def | template_ref)*
+}
+diagram_type = {
+  "type:" ~ diagram_type_name
+}
+diagram_type_name = {
+  "architecture" | "flow" | "sequence" | "network" | "database" | identifier
+}
+template_ref = {
+  "template:" ~ identifier
+}
+
+// Layout definitions
+layout_def = {
+  "layout" ~ "{" ~
+  (layout_type_def | layout_direction_def | layout_spacing_def)* ~
+  "}"
+}
+layout_type_def = { "type:" ~ layout_type }
+layout_type = { "layered" | "force" | "grid" | "tree" | "manual" }
+layout_direction_def = { "direction:" ~ layout_direction }
+layout_direction = {
+  "horizontal" | "vertical" |
+  "top-to-bottom" | "bottom-to-top" |
+  "left-to-right" | "right-to-left"
+}
+layout_spacing_def = { "spacing:" ~ "{" ~ spacing_params ~ "}" }
+spacing_params = {
+  (spacing_x | spacing_y | node_spacing | layer_spacing)*
+}
+spacing_x = { "x:" ~ number }
+spacing_y = { "y:" ~ number }
+node_spacing = { "node_spacing:" ~ number }
+layer_spacing = { "layer_spacing:" ~ number }
 
 // Style blocks
 style_block = { "{" ~ attribute* ~ "}" }
