@@ -141,6 +141,77 @@ pub struct ElementBinding {
 pub struct ExcalidrawGenerator;
 
 impl ExcalidrawGenerator {
+    /// Get the render order for containers (parent containers first, then children)
+    fn get_container_render_order(containers: &[ContainerData]) -> Vec<usize> {
+        let mut order = Vec::new();
+        let mut visited = vec![false; containers.len()];
+
+        // Find root containers (those without parents)
+        for i in 0..containers.len() {
+            if containers[i].parent_container.is_none() && !visited[i] {
+                Self::visit_container_tree(i, containers, &mut visited, &mut order);
+            }
+        }
+
+        order
+    }
+
+    fn visit_container_tree(
+        idx: usize,
+        containers: &[ContainerData],
+        visited: &mut Vec<bool>,
+        order: &mut Vec<usize>,
+    ) {
+        if visited[idx] {
+            return;
+        }
+
+        visited[idx] = true;
+        order.push(idx);
+
+        // Visit nested containers
+        for &nested_idx in &containers[idx].nested_containers {
+            Self::visit_container_tree(nested_idx, containers, visited, order);
+        }
+    }
+
+    /// Get the render order for groups (parent groups first, then children)
+    fn get_group_render_order(groups: &[GroupData]) -> Vec<usize> {
+        let mut order = Vec::new();
+        let mut visited = vec![false; groups.len()];
+
+        // Find root groups (those without parents)
+        for i in 0..groups.len() {
+            if groups[i].parent_group.is_none()
+                && groups[i].parent_container.is_none()
+                && !visited[i]
+            {
+                Self::visit_group_tree(i, groups, &mut visited, &mut order);
+            }
+        }
+
+        order
+    }
+
+    fn visit_group_tree(
+        idx: usize,
+        groups: &[GroupData],
+        visited: &mut Vec<bool>,
+        order: &mut Vec<usize>,
+    ) {
+        if visited[idx] {
+            return;
+        }
+
+        visited[idx] = true;
+        order.push(idx);
+
+        // Visit nested groups
+        for &nested_idx in &groups[idx].nested_groups {
+            Self::visit_group_tree(nested_idx, groups, visited, order);
+        }
+    }
+
     /// Generate a complete Excalidraw file from an intermediate graph
     ///
     /// This is the main entry point for the generator. It creates a complete
@@ -182,8 +253,10 @@ impl ExcalidrawGenerator {
         let mut node_id_map = std::collections::HashMap::new();
         let mut node_element_indices = std::collections::HashMap::new();
 
-        // Generate group elements first (visual grouping rectangles)
-        for group in &igr.groups {
+        // Generate group elements first (visual grouping rectangles) in depth-first order
+        let group_order = Self::get_group_render_order(&igr.groups);
+        for &group_idx in &group_order {
+            let group = &igr.groups[group_idx];
             if let Some(mut group_element) = Self::generate_group(group)? {
                 let group_id = group_element.id.clone();
 
@@ -220,8 +293,10 @@ impl ExcalidrawGenerator {
             }
         }
 
-        // Generate container elements next (background rectangles)
-        for container in &igr.containers {
+        // Generate container elements in depth-first order (parent containers first)
+        let container_order = Self::get_container_render_order(&igr.containers);
+        for &container_idx in &container_order {
+            let container = &igr.containers[container_idx];
             if let Some(mut container_element) = Self::generate_container(container)? {
                 let container_id = container_element.id.clone();
 

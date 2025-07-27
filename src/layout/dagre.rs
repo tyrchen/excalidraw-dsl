@@ -2,7 +2,7 @@
 use super::LayoutEngine;
 use crate::ast::GroupType;
 use crate::error::{LayoutError, Result};
-use crate::igr::{BoundingBox, IntermediateGraph};
+use crate::igr::{BoundingBox, ContainerData, EdgeData, IntermediateGraph, NodeData};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction as PetDirection;
@@ -689,18 +689,37 @@ impl DagreLayout {
     }
 
     fn calculate_container_bounds(&self, igr: &mut IntermediateGraph) {
-        for container in &mut igr.containers {
-            if container.children.is_empty() {
-                continue;
+        // Calculate bounds in reverse order to handle nested containers
+        // Process children before parents
+        let mut processed = vec![false; igr.containers.len()];
+
+        // Helper to calculate bounds for a single container
+        fn calculate_single_container_bounds(
+            idx: usize,
+            containers: &mut Vec<ContainerData>,
+            graph: &petgraph::Graph<NodeData, EdgeData>,
+            processed: &mut Vec<bool>,
+        ) {
+            if processed[idx] {
+                return;
             }
 
+            // First process all nested containers
+            let nested_indices = containers[idx].nested_containers.clone();
+            for &nested_idx in &nested_indices {
+                calculate_single_container_bounds(nested_idx, containers, graph, processed);
+            }
+
+            // Collect data we need before mutating
+            let children = containers[idx].children.clone();
             let mut min_x = f64::INFINITY;
             let mut min_y = f64::INFINITY;
             let mut max_x = f64::NEG_INFINITY;
             let mut max_y = f64::NEG_INFINITY;
 
-            for &child_idx in &container.children {
-                let node = &igr.graph[child_idx];
+            // Include bounds of child nodes
+            for &child_idx in &children {
+                let node = &graph[child_idx];
                 let node_min_x = node.x - node.width / 2.0;
                 let node_max_x = node.x + node.width / 2.0;
                 let node_min_y = node.y - node.height / 2.0;
@@ -712,14 +731,41 @@ impl DagreLayout {
                 max_y = max_y.max(node_max_y);
             }
 
-            // Add padding
-            let padding = 20.0;
-            container.bounds = Some(BoundingBox {
-                x: min_x - padding,
-                y: min_y - padding,
-                width: (max_x - min_x) + 2.0 * padding,
-                height: (max_y - min_y) + 2.0 * padding,
-            });
+            // Include bounds of nested containers
+            for &nested_idx in &nested_indices {
+                if let Some(ref nested_bounds) = containers[nested_idx].bounds {
+                    min_x = min_x.min(nested_bounds.x);
+                    max_x = max_x.max(nested_bounds.x + nested_bounds.width);
+                    min_y = min_y.min(nested_bounds.y);
+                    max_y = max_y.max(nested_bounds.y + nested_bounds.height);
+                }
+            }
+
+            // Only set bounds if we found any content
+            if min_x != f64::INFINITY {
+                // Add padding
+                let padding = 20.0;
+                containers[idx].bounds = Some(BoundingBox {
+                    x: min_x - padding,
+                    y: min_y - padding,
+                    width: (max_x - min_x) + 2.0 * padding,
+                    height: (max_y - min_y) + 2.0 * padding,
+                });
+            }
+
+            processed[idx] = true;
+        }
+
+        // Process all root containers (those without parents)
+        for i in 0..igr.containers.len() {
+            if igr.containers[i].parent_container.is_none() {
+                calculate_single_container_bounds(
+                    i,
+                    &mut igr.containers,
+                    &igr.graph,
+                    &mut processed,
+                );
+            }
         }
     }
 }

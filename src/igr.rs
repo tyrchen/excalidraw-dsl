@@ -37,6 +37,9 @@ pub struct ContainerData {
     pub id: Option<String>,
     pub label: Option<String>,
     pub children: Vec<NodeIndex>,
+    pub nested_containers: Vec<usize>, // Indices into containers vec
+    pub nested_groups: Vec<usize>,     // Indices into groups vec
+    pub parent_container: Option<usize>, // Index of parent container if nested
     pub attributes: ExcalidrawAttributes,
     pub bounds: Option<BoundingBox>,
 }
@@ -47,6 +50,10 @@ pub struct GroupData {
     pub label: Option<String>,
     pub group_type: GroupType,
     pub children: Vec<NodeIndex>,
+    pub nested_containers: Vec<usize>, // Indices into containers vec
+    pub nested_groups: Vec<usize>,     // Indices into groups vec
+    pub parent_group: Option<usize>,   // Index of parent group if nested
+    pub parent_container: Option<usize>, // Index of parent container if in container
     pub attributes: ExcalidrawAttributes,
     pub bounds: Option<BoundingBox>,
 }
@@ -110,17 +117,23 @@ impl IntermediateGraph {
         igr.global_config = document.config;
         igr.component_types = document.component_types;
 
-        // First pass: Build all nodes from top-level, containers, and groups
-        let mut all_nodes = document.nodes;
-        let mut all_edges = document.edges;
+        // First, collect all nodes and edges recursively
+        let mut all_nodes = document.nodes.clone();
+        let mut all_edges = document.edges.clone();
 
-        // Extract nodes and edges from containers (including nested ones)
-        Self::extract_from_containers(&document.containers, &mut all_nodes, &mut all_edges)?;
+        // Process all statements recursively to collect nodes and edges
+        Self::collect_nodes_and_edges_from_containers(
+            &document.containers,
+            &mut all_nodes,
+            &mut all_edges,
+        )?;
+        Self::collect_nodes_and_edges_from_groups(
+            &document.groups,
+            &mut all_nodes,
+            &mut all_edges,
+        )?;
 
-        // Extract nodes and edges from groups (including nested ones)
-        Self::extract_from_groups(&document.groups, &mut all_nodes, &mut all_edges)?;
-
-        // Build nodes
+        // Build all nodes first
         for node_def in all_nodes {
             if igr.node_map.contains_key(&node_def.id) {
                 return Err(BuildError::DuplicateNode(node_def.id).into());
@@ -146,11 +159,11 @@ impl IntermediateGraph {
             igr.graph.add_edge(*from_idx, *to_idx, edge_data);
         }
 
-        // Build containers
-        for container_def in document.containers {
-            let container_data = ContainerData::from_definition(container_def, &igr.node_map)?;
-            igr.containers.push(container_data);
-        }
+        // Build container hierarchy
+        igr.build_container_hierarchy(document.containers, None)?;
+
+        // Build group hierarchy
+        igr.build_group_hierarchy(document.groups, None, None)?;
 
         // Process connections (convert to edges)
         for connection in document.connections {
@@ -159,12 +172,6 @@ impl IntermediateGraph {
             for (from_idx, to_idx, edge_data) in edges {
                 igr.graph.add_edge(from_idx, to_idx, edge_data);
             }
-        }
-
-        // Build groups
-        for group_def in document.groups {
-            let group_data = GroupData::from_definition(group_def, &igr.node_map)?;
-            igr.groups.push(group_data);
         }
 
         Ok(igr)
@@ -181,8 +188,111 @@ impl IntermediateGraph {
             .map(move |idx| (idx, &mut self.graph[idx]))
     }
 
-    /// Recursively extract nodes and edges from containers, handling nesting
-    fn extract_from_containers(
+    /// Build the container hierarchy with proper parent-child relationships
+    fn build_container_hierarchy(
+        &mut self,
+        containers: Vec<ContainerDefinition>,
+        parent_container_idx: Option<usize>,
+    ) -> Result<()> {
+        for container_def in containers {
+            // First create the container data
+            let mut container_data =
+                ContainerData::from_definition(container_def.clone(), &self.node_map)?;
+            container_data.parent_container = parent_container_idx;
+
+            let container_idx = self.containers.len();
+            self.containers.push(container_data);
+
+            // Process nested structures
+            let mut nested_containers = Vec::new();
+            let mut nested_groups = Vec::new();
+
+            for statement in container_def.internal_statements {
+                match statement {
+                    Statement::Container(nested_container_def) => {
+                        nested_containers.push(nested_container_def);
+                    }
+                    Statement::Group(nested_group_def) => {
+                        nested_groups.push(nested_group_def);
+                    }
+                    _ => {} // Nodes and edges already processed
+                }
+            }
+
+            // Record nested container indices
+            let nested_container_start_idx = self.containers.len();
+            self.build_container_hierarchy(nested_containers, Some(container_idx))?;
+            let nested_container_end_idx = self.containers.len();
+
+            // Record nested group indices
+            let nested_group_start_idx = self.groups.len();
+            self.build_group_hierarchy(nested_groups, None, Some(container_idx))?;
+            let nested_group_end_idx = self.groups.len();
+
+            // Update the container with its nested indices
+            if let Some(container) = self.containers.get_mut(container_idx) {
+                container.nested_containers =
+                    (nested_container_start_idx..nested_container_end_idx).collect();
+                container.nested_groups = (nested_group_start_idx..nested_group_end_idx).collect();
+            }
+        }
+        Ok(())
+    }
+
+    /// Build the group hierarchy with proper parent-child relationships
+    fn build_group_hierarchy(
+        &mut self,
+        groups: Vec<GroupDefinition>,
+        parent_group_idx: Option<usize>,
+        parent_container_idx: Option<usize>,
+    ) -> Result<()> {
+        for group_def in groups {
+            // First create the group data
+            let mut group_data = GroupData::from_definition(group_def.clone(), &self.node_map)?;
+            group_data.parent_group = parent_group_idx;
+            group_data.parent_container = parent_container_idx;
+
+            let group_idx = self.groups.len();
+            self.groups.push(group_data);
+
+            // Process nested structures
+            let mut nested_containers = Vec::new();
+            let mut nested_groups = Vec::new();
+
+            for statement in group_def.internal_statements {
+                match statement {
+                    Statement::Container(nested_container_def) => {
+                        nested_containers.push(nested_container_def);
+                    }
+                    Statement::Group(nested_group_def) => {
+                        nested_groups.push(nested_group_def);
+                    }
+                    _ => {} // Nodes and edges already processed
+                }
+            }
+
+            // Record nested container indices
+            let nested_container_start_idx = self.containers.len();
+            self.build_container_hierarchy(nested_containers, None)?;
+            let nested_container_end_idx = self.containers.len();
+
+            // Record nested group indices
+            let nested_group_start_idx = self.groups.len();
+            self.build_group_hierarchy(nested_groups, Some(group_idx), None)?;
+            let nested_group_end_idx = self.groups.len();
+
+            // Update the group with its nested indices
+            if let Some(group) = self.groups.get_mut(group_idx) {
+                group.nested_containers =
+                    (nested_container_start_idx..nested_container_end_idx).collect();
+                group.nested_groups = (nested_group_start_idx..nested_group_end_idx).collect();
+            }
+        }
+        Ok(())
+    }
+
+    /// Collect all nodes and edges from containers recursively
+    fn collect_nodes_and_edges_from_containers(
         containers: &[ContainerDefinition],
         all_nodes: &mut Vec<NodeDefinition>,
         all_edges: &mut Vec<EdgeDefinition>,
@@ -193,19 +303,21 @@ impl IntermediateGraph {
                     Statement::Node(node) => all_nodes.push(node.clone()),
                     Statement::Edge(edge) => all_edges.push(edge.clone()),
                     Statement::Container(nested_container) => {
-                        // Recursively handle nested containers
-                        Self::extract_from_containers(
+                        Self::collect_nodes_and_edges_from_containers(
                             &[nested_container.clone()],
                             all_nodes,
                             all_edges,
                         )?;
                     }
                     Statement::Group(nested_group) => {
-                        // Handle groups within containers
-                        Self::extract_from_groups(&[nested_group.clone()], all_nodes, all_edges)?;
+                        Self::collect_nodes_and_edges_from_groups(
+                            &[nested_group.clone()],
+                            all_nodes,
+                            all_edges,
+                        )?;
                     }
                     Statement::Connection(_) => {
-                        // Connections are handled separately at top level
+                        // Connections are handled separately
                     }
                 }
             }
@@ -213,8 +325,8 @@ impl IntermediateGraph {
         Ok(())
     }
 
-    /// Recursively extract nodes and edges from groups, handling nesting
-    fn extract_from_groups(
+    /// Collect all nodes and edges from groups recursively
+    fn collect_nodes_and_edges_from_groups(
         groups: &[GroupDefinition],
         all_nodes: &mut Vec<NodeDefinition>,
         all_edges: &mut Vec<EdgeDefinition>,
@@ -225,19 +337,21 @@ impl IntermediateGraph {
                     Statement::Node(node) => all_nodes.push(node.clone()),
                     Statement::Edge(edge) => all_edges.push(edge.clone()),
                     Statement::Container(nested_container) => {
-                        // Handle containers within groups
-                        Self::extract_from_containers(
+                        Self::collect_nodes_and_edges_from_containers(
                             &[nested_container.clone()],
                             all_nodes,
                             all_edges,
                         )?;
                     }
                     Statement::Group(nested_group) => {
-                        // Recursively handle nested groups
-                        Self::extract_from_groups(&[nested_group.clone()], all_nodes, all_edges)?;
+                        Self::collect_nodes_and_edges_from_groups(
+                            &[nested_group.clone()],
+                            all_nodes,
+                            all_edges,
+                        )?;
                     }
                     Statement::Connection(_) => {
-                        // Connections are handled separately at top level
+                        // Connections are handled separately
                     }
                 }
             }
@@ -495,6 +609,9 @@ impl ContainerData {
             id: def.id,
             label: def.label,
             children,
+            nested_containers: Vec::new(),
+            nested_groups: Vec::new(),
+            parent_container: None,
             attributes,
             bounds: None,
         })
@@ -527,6 +644,10 @@ impl GroupData {
             label: def.label,
             group_type: def.group_type,
             children,
+            nested_containers: Vec::new(),
+            nested_groups: Vec::new(),
+            parent_group: None,
+            parent_container: None,
             attributes,
             bounds: None,
         })

@@ -9,7 +9,6 @@ fn compile_to_json(edsl: &str) -> Result<Value> {
 }
 
 #[test]
-#[ignore = "Nested containers not yet implemented"]
 fn test_nested_containers() {
     let edsl = r#"
 container "Outer System" {
