@@ -1,13 +1,13 @@
 ---
-layout: dagre
+layout: elk
 direction: TB
 theme: light
-node_spacing: 120
-edge_spacing: 80
+node_spacing: 150
+edge_spacing: 100
 ---
 
-# Distributed Data Platform Architecture
-# Modern data platform with data lake, warehouse, real-time processing, and ML pipelines
+# Distributed Data Platform Architecture - Simplified
+# Shows essential data flow between major platform components
 
 # Data Sources
 container "Data Sources" as data_sources {
@@ -34,7 +34,6 @@ container "Data Sources" as data_sources {
     strokeColor: "#0284c7";
     fontSize: 14;
     shape: cylinder;
-    width: 160;
   }
 
   crm_system[CRM System] {
@@ -47,13 +46,6 @@ container "Data Sources" as data_sources {
     backgroundColor: "#7dd3fc";
     strokeColor: "#0284c7";
     fontSize: 14;
-  }
-
-  third_party_apis[Third-party APIs] {
-    backgroundColor: "#7dd3fc";
-    strokeColor: "#0284c7";
-    fontSize: 14;
-    width: 160;
   }
 }
 
@@ -69,7 +61,6 @@ container "Data Ingestion" as data_ingestion {
     backgroundColor: "#fbbf24";
     strokeColor: "#f59e0b";
     fontSize: 16;
-    width: 140;
     shape: ellipse;
   }
 
@@ -77,7 +68,6 @@ container "Data Ingestion" as data_ingestion {
     backgroundColor: "#fed7aa";
     strokeColor: "#f59e0b";
     fontSize: 14;
-    width: 140;
   }
 
   airbyte[Airbyte] {
@@ -92,18 +82,10 @@ container "Data Ingestion" as data_ingestion {
     fontSize: 14;
   }
 
-  api_gateway[Data API Gateway] {
-    backgroundColor: "#fed7aa";
-    strokeColor: "#f59e0b";
-    fontSize: 14;
-    width: 140;
-  }
-
-  # Ingestion connections
-  kafka_connect -> kafka: "Streaming Data";
-  airbyte -> kafka: "Batch Sync";
-  debezium -> kafka: "Change Events";
-  api_gateway -> kafka: "API Events";
+  # Simplified internal connections
+  kafka_connect -> kafka: "Stream";
+  airbyte -> kafka: "Batch";
+  debezium -> kafka: "CDC";
 }
 
 # Stream Processing
@@ -118,7 +100,6 @@ container "Real-time Processing" as stream_processing {
     backgroundColor: "#16a34a";
     strokeColor: "#15803d";
     fontSize: 16;
-    width: 140;
     color: "#ffffff";
   }
 
@@ -128,31 +109,14 @@ container "Real-time Processing" as stream_processing {
     fontSize: 14;
   }
 
-  storm[Apache Storm] {
-    backgroundColor: "#86efac";
-    strokeColor: "#22c55e";
-    fontSize: 14;
-  }
-
-  kinesis[AWS Kinesis] {
-    backgroundColor: "#86efac";
-    strokeColor: "#22c55e";
-    fontSize: 14;
-  }
-
   real_time_ml[Real-time ML] {
     backgroundColor: "#6ee7b7";
     strokeColor: "#10b981";
     fontSize: 14;
-    width: 140;
   }
 
-  # Stream processing flow
-  kafka -> kafka_streams: "Event Streams";
-  kafka -> flink: "Complex Processing";
-  kafka -> storm: "Low Latency";
-  kafka -> kinesis: "AWS Integration";
-  flink -> real_time_ml: "Feature Engineering";
+  # Simplified internal flow
+  kafka_streams -> real_time_ml: "Features";
 }
 
 # Data Lake (Raw Storage)
@@ -168,7 +132,6 @@ container "Data Lake" as data_lake {
     strokeColor: "#c2410c";
     fontSize: 16;
     shape: cylinder;
-    width: 140;
     color: "#ffffff";
   }
 
@@ -177,7 +140,6 @@ container "Data Lake" as data_lake {
     strokeColor: "#ea580c";
     fontSize: 14;
     shape: cylinder;
-    width: 160;
   }
 
   s3_curated[S3 Curated Zone] {
@@ -185,24 +147,11 @@ container "Data Lake" as data_lake {
     strokeColor: "#ea580c";
     fontSize: 14;
     shape: cylinder;
-    width: 160;
   }
 
-  delta_lake[Delta Lake] {
-    backgroundColor: "#fed7aa";
-    strokeColor: "#ea580c";
-    fontSize: 14;
-  }
-
-  iceberg[Apache Iceberg] {
-    backgroundColor: "#fed7aa";
-    strokeColor: "#ea580c";
-    fontSize: 14;
-  }
-
-  # Data lake zones
-  s3_raw -> s3_processed: "Clean & Transform";
-  s3_processed -> s3_curated: "Business Logic";
+  # Data lake zones flow
+  s3_raw -> s3_processed: "Clean";
+  s3_processed -> s3_curated: "Transform";
 }
 
 # Batch Processing
@@ -217,7 +166,6 @@ container "Batch Processing" as batch_processing {
     backgroundColor: "#7c3aed";
     strokeColor: "#6b21a8";
     fontSize: 16;
-    width: 140;
     color: "#ffffff";
   }
 
@@ -233,23 +181,9 @@ container "Batch Processing" as batch_processing {
     fontSize: 14;
   }
 
-  great_expectations[Great Expectations] {
-    backgroundColor: "#ddd6fe";
-    strokeColor: "#8b5cf6";
-    fontSize: 14;
-    width: 160;
-  }
-
-  dagster[Dagster] {
-    backgroundColor: "#c4b5fd";
-    strokeColor: "#8b5cf6";
-    fontSize: 14;
-  }
-
-  # Batch orchestration
-  airflow -> spark: "Schedule Jobs";
-  airflow -> dbt: "Transform Data";
-  spark -> great_expectations: "Data Quality";
+  # Orchestration
+  airflow -> spark: "Schedule";
+  airflow -> dbt: "Transform";
 }
 
 # Data Warehouse
@@ -265,34 +199,14 @@ container "Data Warehouse" as data_warehouse {
     strokeColor: "#7c3aed";
     fontSize: 16;
     shape: cylinder;
-    width: 120;
     color: "#ffffff";
-  }
-
-  redshift[Amazon Redshift] {
-    backgroundColor: "#c4b5fd";
-    strokeColor: "#8b5cf6";
-    fontSize: 14;
-    shape: cylinder;
-  }
-
-  bigquery[Google BigQuery] {
-    backgroundColor: "#c4b5fd";
-    strokeColor: "#8b5cf6";
-    fontSize: 14;
-    shape: cylinder;
   }
 
   dimensional_models[Dimensional Models] {
     backgroundColor: "#ddd6fe";
     strokeColor: "#8b5cf6";
     fontSize: 14;
-    width: 160;
   }
-
-  # Warehouse connections
-  dbt -> snowflake: "Modeled Data";
-  dbt -> dimensional_models: "Star Schema";
 }
 
 # Machine Learning Platform
@@ -307,45 +221,28 @@ container "ML Platform" as ml_platform {
     backgroundColor: "#10b981";
     strokeColor: "#047857";
     fontSize: 16;
-    width: 120;
     color: "#ffffff";
-  }
-
-  kubeflow[Kubeflow] {
-    backgroundColor: "#6ee7b7";
-    strokeColor: "#10b981";
-    fontSize: 14;
   }
 
   feature_store[Feature Store] {
     backgroundColor: "#6ee7b7";
     strokeColor: "#10b981";
     fontSize: 14;
-    width: 140;
   }
 
   model_registry[Model Registry] {
     backgroundColor: "#6ee7b7";
     strokeColor: "#10b981";
     fontSize: 14;
-    width: 140;
-  }
-
-  jupyter[Jupyter Hub] {
-    backgroundColor: "#34d399";
-    strokeColor: "#059669";
-    fontSize: 14;
   }
 
   # ML workflow
-  spark -> feature_store: "Feature Engineering";
-  jupyter -> mlflow: "Experiment Tracking";
-  mlflow -> model_registry: "Model Versioning";
-  kubeflow -> model_registry: "Model Deployment";
+  feature_store -> mlflow: "Features";
+  mlflow -> model_registry: "Models";
 }
 
 # Analytics & BI
-container "Analytics & Business Intelligence" as analytics {
+container "Analytics & BI" as analytics {
   style: {
     backgroundColor: "#fef2f2";
     strokeColor: "#dc2626";
@@ -356,7 +253,6 @@ container "Analytics & Business Intelligence" as analytics {
     backgroundColor: "#dc2626";
     strokeColor: "#b91c1c";
     fontSize: 16;
-    width: 120;
     color: "#ffffff";
   }
 
@@ -366,31 +262,11 @@ container "Analytics & Business Intelligence" as analytics {
     fontSize: 14;
   }
 
-  superset[Apache Superset] {
-    backgroundColor: "#fca5a5";
-    strokeColor: "#dc2626";
-    fontSize: 14;
-    width: 140;
-  }
-
-  metabase[Metabase] {
-    backgroundColor: "#fca5a5";
-    strokeColor: "#dc2626";
-    fontSize: 14;
-  }
-
   self_service[Self-Service Analytics] {
     backgroundColor: "#f87171";
     strokeColor: "#dc2626";
     fontSize: 14;
-    width: 160;
   }
-
-  # BI connections
-  snowflake -> tableau: "Data Visualization";
-  snowflake -> looker: "Business Metrics";
-  snowflake -> superset: "Dashboards";
-  dimensional_models -> self_service: "Ad-hoc Analysis";
 }
 
 # Data Governance
@@ -405,23 +281,10 @@ container "Data Governance" as governance {
     backgroundColor: "#ca8a04";
     strokeColor: "#a16207";
     fontSize: 16;
-    width: 140;
     color: "#ffffff";
   }
 
-  apache_atlas[Apache Atlas] {
-    backgroundColor: "#fde047";
-    strokeColor: "#ca8a04";
-    fontSize: 14;
-  }
-
   data_lineage[Data Lineage] {
-    backgroundColor: "#fde047";
-    strokeColor: "#ca8a04";
-    fontSize: 14;
-  }
-
-  privacy_vault[Privacy Vault] {
     backgroundColor: "#fde047";
     strokeColor: "#ca8a04";
     fontSize: 14;
@@ -432,108 +295,57 @@ container "Data Governance" as governance {
     strokeColor: "#ca8a04";
     fontSize: 14;
   }
-
-  # Governance flow
-  apache_atlas -> data_catalog: "Metadata";
-  dbt -> data_lineage: "Transform Lineage";
-  great_expectations -> data_quality: "Quality Metrics";
 }
 
-# Monitoring & Observability
-container "Data Observability" as data_observability {
-  style: {
-    backgroundColor: "#f8fafc";
-    strokeColor: "#64748b";
-    strokeWidth: 2;
-  }
+# === CONTAINER TO CONTAINER CONNECTIONS ===
 
-  monte_carlo[Monte Carlo] {
-    backgroundColor: "#64748b";
-    strokeColor: "#475569";
-    fontSize: 14;
-    width: 140;
-    color: "#ffffff";
-  }
+# Data Flow Pipeline
+data_sources -> data_ingestion: "Raw Data" {
+  routing: orthogonal;
+};
 
-  datafold[Datafold] {
-    backgroundColor: "#e2e8f0";
-    strokeColor: "#64748b";
-    fontSize: 14;
-  }
+data_ingestion -> stream_processing: "Event Streams" {
+  routing: orthogonal;
+};
 
-  data_alerts[Data Alerts] {
-    backgroundColor: "#e2e8f0";
-    strokeColor: "#64748b";
-    fontSize: 14;
-  }
+data_ingestion -> data_lake: "Raw Storage" {
+  routing: orthogonal;
+};
 
-  pipeline_monitoring[Pipeline Monitoring] {
-    backgroundColor: "#e2e8f0";
-    strokeColor: "#64748b";
-    fontSize: 14;
-    width: 160;
-  }
-}
+stream_processing -> data_lake: "Processed Events" {
+  routing: orthogonal;
+};
 
-# Data Sources to Ingestion
-web_events -> api_gateway: "Events";
-mobile_events -> api_gateway: "Mobile Data";
-transaction_db -> debezium: "CDC";
-crm_system -> airbyte: "Sync";
-iot_sensors -> kafka_connect: "Sensor Data";
-third_party_apis -> airbyte: "API Data";
+data_lake -> batch_processing: "Batch Jobs" {
+  routing: orthogonal;
+};
 
-# Ingestion to Processing
-kafka -> s3_raw: "Raw Events";
-kafka_streams -> s3_processed: "Processed Events";
-flink -> s3_curated: "Enriched Data";
+batch_processing -> data_warehouse: "Transformed Data" {
+  routing: orthogonal;
+};
 
-# Lake to Warehouse
-s3_curated -> spark: "Batch Processing";
-spark -> snowflake: "Transformed Data";
+data_warehouse -> analytics: "Business Data" {
+  routing: orthogonal;
+};
 
-# ML Integration
-s3_curated -> feature_store: "Raw Features";
-snowflake -> jupyter: "Analysis Data";
-model_registry -> real_time_ml: "Deployed Models";
+# ML Pipeline
+data_lake -> ml_platform: "Training Data" {
+  routing: orthogonal;
+};
+
+ml_platform -> stream_processing: "Deployed Models" {
+  routing: orthogonal;
+};
 
 # Governance Integration
-s3_raw -> apache_atlas: "Lake Metadata";
-snowflake -> apache_atlas: "Warehouse Metadata";
-mlflow -> data_catalog: "ML Metadata";
+data_lake -> governance: "Metadata" {
+  routing: orthogonal;
+};
 
-# Monitoring Integration
-airflow -> pipeline_monitoring: "Job Status";
-spark -> monte_carlo: "Data Quality";
-snowflake -> datafold: "Data Drift";
-data_quality -> data_alerts: "Quality Issues";
+data_warehouse -> governance: "Lineage" {
+  routing: orthogonal;
+};
 
-# Architecture Benefits
-data_platform_benefits[Data Platform Benefits] {
-  backgroundColor: "#f0f9ff";
-  strokeColor: "#0ea5e9";
-  fontSize: 12;
-  width: 180;
-  height: 120;
-  text: "• Scalable architecture\n• Real-time & batch processing\n• Self-service analytics\n• Data governance\n• ML/AI enablement\n• Cost optimization";
-}
-
-# Data Mesh Principles
-data_mesh_principles[Data Mesh Principles] {
-  backgroundColor: "#ecfdf5";
-  strokeColor: "#10b981";
-  fontSize: 12;
-  width: 160;
-  height: 100;
-  text: "• Domain ownership\n• Data as a product\n• Self-serve platform\n• Federated governance";
-}
-
-# Data Zones
-data_zones[Data Lake Zones] {
-  backgroundColor: "#fef3e2";
-  strokeColor: "#ea580c";
-  fontSize: 12;
-  width: 140;
-  height: 100;
-  text: "Raw: Immutable source\nProcessed: Cleaned data\nCurated: Business ready\nSandbox: Experimentation";
-}
+batch_processing -> governance: "Quality Metrics" {
+  routing: orthogonal;
+};

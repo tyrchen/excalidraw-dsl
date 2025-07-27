@@ -1,10 +1,13 @@
 ---
-layout: dagre
+layout: elk
 direction: TB
 theme: light
+node_spacing: 150
+edge_spacing: 100
 ---
 
-# Microservices Architecture Example
+# Microservices Architecture - Simplified
+# Essential microservices patterns with clean container-to-container connections
 
 # Frontend Layer
 container "Frontend" as frontend {
@@ -40,28 +43,12 @@ container "Service Mesh" as services {
     strokeColor: "#16a34a";
   }
 
-  # Core Services
   auth_service[Auth Service] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
 
-  user_service[User Service] {
-    backgroundColor: "#86efac";
-    strokeColor: "#22c55e";
-  }
-
-  order_service[Order Service] {
-    backgroundColor: "#86efac";
-    strokeColor: "#22c55e";
-  }
-
-  payment_service[Payment Service] {
-    backgroundColor: "#86efac";
-    strokeColor: "#22c55e";
-  }
-
-  inventory_service[Inventory Service] {
+  business_services[Business Services] {
     backgroundColor: "#86efac";
     strokeColor: "#22c55e";
   }
@@ -71,22 +58,9 @@ container "Service Mesh" as services {
     strokeColor: "#22c55e";
   }
 
-  # Internal connections
-  order_service -> payment_service: "process payment" {
-    routing: orthogonal;
-  };
-  order_service -> inventory_service: "check stock" {
-    routing: orthogonal;
-  };
-  payment_service -> notification_service: "send receipt" {
-    routing: orthogonal;
-  };
-  order_service -> notification_service: "order updates" {
-    routing: orthogonal;
-  };
-  auth_service -> user_service: "validate" {
-    routing: orthogonal;
-  };
+  # Simplified internal flow
+  auth_service -> business_services: "Authorize";
+  business_services -> notification_service: "Events";
 }
 
 # Data Layer
@@ -97,19 +71,7 @@ container "Data Layer" as data {
     strokeWidth: 2;
   }
 
-  user_db[User DB] {
-    shape: cylinder;
-    backgroundColor: "#fde047";
-    strokeColor: "#facc15";
-  }
-
-  order_db[Order DB] {
-    shape: cylinder;
-    backgroundColor: "#fde047";
-    strokeColor: "#facc15";
-  }
-
-  inventory_db[Inventory DB] {
+  databases[Service Databases] {
     shape: cylinder;
     backgroundColor: "#fde047";
     strokeColor: "#facc15";
@@ -137,89 +99,40 @@ container "External Services" as external {
     strokeStyle: dotted;
   }
 
-  payment_gateway[Payment Gateway] {
-    backgroundColor: "#fca5a5";
-    strokeColor: "#f87171";
-  }
-
-  email_provider[Email Provider] {
-    backgroundColor: "#fca5a5";
-    strokeColor: "#f87171";
-  }
-
-  sms_provider[SMS Provider] {
+  external_apis[External APIs] {
     backgroundColor: "#fca5a5";
     strokeColor: "#f87171";
   }
 }
 
-# Connections between layers
-web_app -> api_gateway {
-  routing: orthogonal;
-};
-mobile_app -> api_gateway {
+# === CONTAINER TO CONTAINER CONNECTIONS ===
+
+# Frontend to Gateway
+frontend -> api_gateway: "API Requests" {
   routing: orthogonal;
 };
 
-api_gateway -> auth_service {
-  routing: orthogonal;
-};
-api_gateway -> user_service {
-  routing: orthogonal;
-};
-api_gateway -> order_service {
-  routing: orthogonal;
-};
-api_gateway -> inventory_service {
+# Gateway to Services
+api_gateway -> services: "Route Requests" {
   routing: orthogonal;
 };
 
-# Service to database connections
-user_service -> user_db {
-  routing: orthogonal;
-};
-auth_service -> user_db {
-  routing: orthogonal;
-};
-order_service -> order_db {
-  routing: orthogonal;
-};
-inventory_service -> inventory_db {
+# Services to Data
+services -> data: "Data Operations" {
   routing: orthogonal;
 };
 
-# Cache connections
-user_service -> cache: "cache user data" {
-  routing: orthogonal;
-};
-order_service -> cache: "cache orders" {
-  routing: orthogonal;
-};
-inventory_service -> cache: "cache stock" {
+# Services to Queue
+services -> message_queue: "Async Events" {
   routing: orthogonal;
 };
 
-# Message queue connections
-order_service -> message_queue: "publish events" {
-  routing: orthogonal;
-};
-payment_service -> message_queue: "publish events" {
-  routing: orthogonal;
-};
-notification_service -- message_queue: "subscribe events" {
-  routing: orthogonal;
-};
-inventory_service -- message_queue: "subscribe events" {
+# Queue to Services (Subscription)
+message_queue -> services: "Event Processing" {
   routing: orthogonal;
 };
 
-# External service connections
-payment_service -> payment_gateway {
-  routing: orthogonal;
-};
-notification_service -> email_provider {
-  routing: orthogonal;
-};
-notification_service -> sms_provider {
+# Services to External
+services -> external: "External Calls" {
   routing: orthogonal;
 };
