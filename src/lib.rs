@@ -1,13 +1,13 @@
 // src/lib.rs
-#![allow(clippy::large_enum_variant)]
-#![allow(clippy::result_large_err)]
 
 pub mod ast;
 pub mod error;
+pub mod fluent;
 pub mod generator;
 pub mod igr;
 pub mod layout;
 pub mod parser;
+pub mod presets;
 #[cfg(feature = "routing")]
 pub mod routing;
 
@@ -24,6 +24,8 @@ pub mod server;
 mod tests;
 
 pub use error::{EDSLError, Result};
+pub use fluent::DiagramBuilder;
+pub use presets::{DiagramPresets, ThemePresets};
 
 use crate::generator::ExcalidrawGenerator;
 use crate::igr::IntermediateGraph;
@@ -38,16 +40,110 @@ pub struct EDSLCompiler {
     layout_manager: LayoutManager,
     #[cfg(feature = "llm")]
     llm_optimizer: Option<llm::LLMLayoutOptimizer>,
+    /// Whether to validate output after generation
+    #[allow(dead_code)]
+    validate_output: bool,
+    /// Whether to use parallel processing for layout calculations
+    #[allow(dead_code)]
+    parallel_layout: bool,
+    /// Maximum number of threads for parallel operations
+    #[allow(dead_code)]
+    max_threads: Option<usize>,
+}
+
+/// Builder for creating customized EDSLCompiler instances
+pub struct EDSLCompilerBuilder {
+    layout_manager: Option<LayoutManager>,
+    #[cfg(feature = "llm")]
+    llm_api_key: Option<String>,
+    validate_output: bool,
+    parallel_layout: bool,
+    max_threads: Option<usize>,
+    cache_enabled: bool,
+}
+
+impl Default for EDSLCompilerBuilder {
+    fn default() -> Self {
+        Self {
+            layout_manager: None,
+            #[cfg(feature = "llm")]
+            llm_api_key: None,
+            validate_output: false,
+            parallel_layout: true,
+            max_threads: None,
+            cache_enabled: true,
+        }
+    }
+}
+
+impl EDSLCompilerBuilder {
+    /// Create a new compiler builder
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a custom layout manager
+    pub fn with_layout_manager(mut self, manager: LayoutManager) -> Self {
+        self.layout_manager = Some(manager);
+        self
+    }
+
+    /// Enable output validation
+    pub fn with_validation(mut self, enabled: bool) -> Self {
+        self.validate_output = enabled;
+        self
+    }
+
+    /// Enable parallel layout processing
+    pub fn with_parallel_layout(mut self, enabled: bool) -> Self {
+        self.parallel_layout = enabled;
+        self
+    }
+
+    /// Set maximum threads for parallel operations
+    pub fn with_max_threads(mut self, threads: usize) -> Self {
+        self.max_threads = Some(threads);
+        self
+    }
+
+    /// Enable or disable layout caching
+    pub fn with_cache(mut self, enabled: bool) -> Self {
+        self.cache_enabled = enabled;
+        self
+    }
+
+    /// Enable LLM optimization with API key
+    #[cfg(feature = "llm")]
+    pub fn with_llm_optimization(mut self, api_key: String) -> Self {
+        self.llm_api_key = Some(api_key);
+        self
+    }
+
+    /// Build the EDSLCompiler instance
+    pub fn build(self) -> EDSLCompiler {
+        let mut layout_manager = self.layout_manager.unwrap_or_default();
+        layout_manager.enable_cache(self.cache_enabled);
+
+        EDSLCompiler {
+            layout_manager,
+            #[cfg(feature = "llm")]
+            llm_optimizer: self.llm_api_key.map(llm::LLMLayoutOptimizer::new),
+            validate_output: self.validate_output,
+            parallel_layout: self.parallel_layout,
+            max_threads: self.max_threads,
+        }
+    }
 }
 
 impl EDSLCompiler {
     /// Create a new EDSL compiler with default settings
     pub fn new() -> Self {
-        Self {
-            layout_manager: LayoutManager::new(),
-            #[cfg(feature = "llm")]
-            llm_optimizer: None,
-        }
+        EDSLCompilerBuilder::new().build()
+    }
+
+    /// Create a new compiler builder for customization
+    pub fn builder() -> EDSLCompilerBuilder {
+        EDSLCompilerBuilder::new()
     }
 
     /// Process templates if the feature is enabled
@@ -68,7 +164,11 @@ impl EDSLCompiler {
     }
 
     /// Enable LLM layout optimization with the provided API key
+    ///
+    /// # Deprecated
+    /// Use `EDSLCompiler::builder().with_llm_optimization(api_key).build()` instead
     #[cfg(feature = "llm")]
+    #[deprecated(note = "Use EDSLCompiler::builder().with_llm_optimization() instead")]
     pub fn with_llm_optimization(mut self, api_key: String) -> Self {
         self.llm_optimizer = Some(llm::LLMLayoutOptimizer::new(api_key));
         self

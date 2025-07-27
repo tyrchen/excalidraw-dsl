@@ -3,8 +3,11 @@ use crate::ast::{ArrowType, ArrowheadType, FillStyle, GroupType, StrokeStyle};
 use crate::error::{GeneratorError, Result};
 use crate::igr::{ContainerData, EdgeData, GroupData, IntermediateGraph, NodeData};
 use crate::routing::EdgeRouter;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use uuid::Uuid;
 
 // String constants to avoid repeated allocations
@@ -23,6 +26,58 @@ const ELEMENT_TYPE_ELLIPSE: &str = "ellipse";
 const ELEMENT_TYPE_DIAMOND: &str = "diamond";
 const ELEMENT_TYPE_ARROW: &str = "arrow";
 const ELEMENT_TYPE_TEXT: &str = "text";
+
+/// String interning pool for reducing memory allocations
+static STRING_POOL: Lazy<DashMap<String, Arc<str>>> = Lazy::new(DashMap::new);
+
+/// Intern a string to reduce memory usage and improve cache locality
+fn intern_string(s: &str) -> Arc<str> {
+    if let Some(interned) = STRING_POOL.get(s) {
+        Arc::clone(&*interned)
+    } else {
+        let arc_str: Arc<str> = Arc::from(s);
+        STRING_POOL.insert(s.to_string(), Arc::clone(&arc_str));
+        arc_str
+    }
+}
+
+/// Wrapper type for interned strings in serialization
+#[derive(Debug, Clone)]
+struct InternedString(Arc<str>);
+
+impl Serialize for InternedString {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+impl From<&str> for InternedString {
+    fn from(s: &str) -> Self {
+        InternedString(intern_string(s))
+    }
+}
+
+impl From<String> for InternedString {
+    fn from(s: String) -> Self {
+        InternedString(intern_string(&s))
+    }
+}
+
+/// Helper macro to create interned strings efficiently
+macro_rules! istr {
+    ($s:expr) => {
+        intern_string($s).to_string()
+    };
+}
+
+/// Helper function to convert optional strings to interned strings
+#[allow(dead_code)]
+fn intern_opt_string(s: Option<&String>) -> Option<String> {
+    s.map(|s| intern_string(s).to_string())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExcalidrawFile {
@@ -239,13 +294,13 @@ impl ExcalidrawGenerator {
         let elements = Self::generate(igr)?;
 
         Ok(ExcalidrawFile {
-            r#type: EXCALIDRAW_TYPE.to_string(),
+            r#type: istr!(EXCALIDRAW_TYPE),
             version: 2,
-            source: EXCALIDRAW_SOURCE.to_string(),
+            source: istr!(EXCALIDRAW_SOURCE),
             elements,
             app_state: AppState {
                 grid_size: None,
-                view_background_color: DEFAULT_BACKGROUND_COLOR.to_string(),
+                view_background_color: istr!(DEFAULT_BACKGROUND_COLOR),
             },
             files: serde_json::json!({}),
         })

@@ -1,4 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
+
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use excalidraw_dsl::parser::parse_edsl;
 
 const SIMPLE_SYNTAX: &str = r#"

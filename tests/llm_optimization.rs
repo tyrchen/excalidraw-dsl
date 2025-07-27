@@ -10,7 +10,9 @@ mod llm_tests {
         // Test that we can create a compiler with LLM support
         let api_key =
             std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "test_api_key".to_string());
-        let mut compiler = EDSLCompiler::new().with_llm_optimization(api_key);
+        let mut compiler = EDSLCompiler::builder()
+            .with_llm_optimization(api_key)
+            .build();
 
         // The compiler should work normally even with LLM enabled
         let edsl = "node[Test Node]";
@@ -26,7 +28,9 @@ mod llm_tests {
     fn test_llm_optimization_with_complex_diagram() {
         let api_key =
             std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "test_api_key".to_string());
-        let mut compiler = EDSLCompiler::new().with_llm_optimization(api_key);
+        let mut compiler = EDSLCompiler::builder()
+            .with_llm_optimization(api_key)
+            .build();
 
         let edsl = r#"
 ---
@@ -54,7 +58,9 @@ service -> database
     fn test_llm_with_containers() {
         let api_key =
             std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "test_api_key".to_string());
-        let mut compiler = EDSLCompiler::new().with_llm_optimization(api_key);
+        let mut compiler = EDSLCompiler::builder()
+            .with_llm_optimization(api_key)
+            .build();
 
         let edsl = r#"
 container "System" {
@@ -77,7 +83,9 @@ user -> api
     fn test_llm_with_groups() {
         let api_key =
             std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "test_api_key".to_string());
-        let mut compiler = EDSLCompiler::new().with_llm_optimization(api_key);
+        let mut compiler = EDSLCompiler::builder()
+            .with_llm_optimization(api_key)
+            .build();
 
         let edsl = r#"
 group "Feature Group" {

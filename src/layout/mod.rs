@@ -4,12 +4,16 @@ mod dagre;
 mod elk;
 mod force;
 mod manager;
+mod strategy;
 
 pub use cache::{CachedLayout, LayoutCacheKey};
 pub use dagre::{DagreLayout, DagreLayoutOptions, Direction, RankingAlgorithm};
 pub use elk::{ElkAlgorithm, ElkDirection, ElkLayout, ElkLayoutOptions, HierarchyHandling};
 pub use force::{ForceLayout, ForceLayoutOptions};
 pub use manager::LayoutManager;
+pub use strategy::{
+    AdaptiveStrategy, ComplexityHint, CompositeStrategy, LayoutContext, LayoutStrategy,
+};
 
 use crate::error::Result;
 use crate::igr::IntermediateGraph;
@@ -17,6 +21,27 @@ use crate::igr::IntermediateGraph;
 pub trait LayoutEngine: Send + Sync {
     fn layout(&self, igr: &mut IntermediateGraph) -> Result<()>;
     fn name(&self) -> &'static str;
+}
+
+/// Adapter to use LayoutEngine implementations as LayoutStrategy
+pub struct LayoutEngineAdapter<T: LayoutEngine> {
+    engine: T,
+}
+
+impl<T: LayoutEngine> LayoutEngineAdapter<T> {
+    pub fn new(engine: T) -> Self {
+        Self { engine }
+    }
+}
+
+impl<T: LayoutEngine> LayoutStrategy for LayoutEngineAdapter<T> {
+    fn apply(&self, igr: &mut IntermediateGraph, _context: &LayoutContext) -> Result<()> {
+        self.engine.layout(igr)
+    }
+
+    fn name(&self) -> &'static str {
+        self.engine.name()
+    }
 }
 
 #[cfg(test)]

@@ -68,10 +68,15 @@ env_logger = "0.11"
 # File watching (updating to latest major version)
 notify = "8.1"
 
+# Performance and concurrency
+rayon = "1.10"
+dashmap = "6.1"
+once_cell = "1.21"
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.20"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
 
 [features]
 default = ["llm", "server", "templates", "routing"]

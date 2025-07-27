@@ -6,7 +6,9 @@ use crate::igr::{BoundingBox, ContainerData, EdgeData, IntermediateGraph, NodeDa
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction as PetDirection;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
+// use std::sync::{Arc, Mutex}; // Reserved for future parallel processing
 
 // Basic Dagre-like hierarchical layout
 pub struct DagreLayout {
@@ -20,6 +22,10 @@ pub struct DagreLayoutOptions {
     pub edge_sep: f64,
     pub direction: Direction,
     pub ranker: RankingAlgorithm,
+    /// Enable parallel processing for layout calculations
+    pub parallel: bool,
+    /// Minimum nodes per layer to trigger parallel processing
+    pub parallel_threshold: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +51,8 @@ impl Default for DagreLayoutOptions {
             edge_sep: 20.0,                  // Separation between edges
             direction: Direction::LeftRight, // Changed default to left-right
             ranker: RankingAlgorithm::LongestPath,
+            parallel: true,         // Enable parallel processing by default
+            parallel_threshold: 10, // Use parallel processing for layers with 10+ nodes
         }
     }
 }
@@ -466,6 +474,83 @@ impl DagreLayout {
         reference_layer: &[NodeIndex],
         forward: bool,
     ) {
+        if self.options.parallel && layer.len() >= self.options.parallel_threshold {
+            self.sort_layer_by_barycenter_parallel(igr, layer, reference_layer, forward);
+        } else {
+            self.sort_layer_by_barycenter_sequential(igr, layer, reference_layer, forward);
+        }
+    }
+
+    // Parallel version of barycenter sorting
+    fn sort_layer_by_barycenter_parallel(
+        &self,
+        igr: &IntermediateGraph,
+        layer: &mut [NodeIndex],
+        reference_layer: &[NodeIndex],
+        forward: bool,
+    ) {
+        // Create position map for reference layer
+        let positions: HashMap<NodeIndex, usize> = reference_layer
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+
+        // Calculate barycenters in parallel
+        let mut barycenters: Vec<(NodeIndex, Option<f64>)> = layer
+            .par_iter()
+            .map(|&node| {
+                let edges = if forward {
+                    igr.graph.edges_directed(node, PetDirection::Incoming)
+                } else {
+                    igr.graph.edges_directed(node, PetDirection::Outgoing)
+                };
+
+                let (sum, count) = edges.fold((0.0, 0), |(sum, count), edge| {
+                    let other_node = if forward {
+                        edge.source()
+                    } else {
+                        edge.target()
+                    };
+                    if let Some(&pos) = positions.get(&other_node) {
+                        (sum + pos as f64, count + 1)
+                    } else {
+                        (sum, count)
+                    }
+                });
+
+                let barycenter = if count > 0 {
+                    Some(sum / count as f64)
+                } else {
+                    None
+                };
+
+                (node, barycenter)
+            })
+            .collect();
+
+        // Sort by barycenter (must be sequential)
+        barycenters.sort_by(|a, b| match (a.1, b.1) {
+            (Some(ba), Some(bb)) => ba.partial_cmp(&bb).unwrap(),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        });
+
+        // Update the layer
+        for (i, (node, _)) in barycenters.iter().enumerate() {
+            layer[i] = *node;
+        }
+    }
+
+    // Sequential version of barycenter sorting
+    fn sort_layer_by_barycenter_sequential(
+        &self,
+        igr: &IntermediateGraph,
+        layer: &mut [NodeIndex],
+        reference_layer: &[NodeIndex],
+        forward: bool,
+    ) {
         // Create position map for reference layer
         let positions: HashMap<NodeIndex, usize> = reference_layer
             .iter()
@@ -585,6 +670,95 @@ impl DagreLayout {
 
     // Assign positions within each layer
     fn assign_node_positions_within_layers(
+        &self,
+        igr: &mut IntermediateGraph,
+        layers: &[Vec<NodeIndex>],
+    ) {
+        if self.options.parallel {
+            self.assign_node_positions_within_layers_parallel(igr, layers);
+        } else {
+            self.assign_node_positions_within_layers_sequential(igr, layers);
+        }
+    }
+
+    // Parallel version of position assignment
+    fn assign_node_positions_within_layers_parallel(
+        &self,
+        igr: &mut IntermediateGraph,
+        layers: &[Vec<NodeIndex>],
+    ) {
+        // Pre-calculate all layer positions in parallel
+        let layer_positions: Vec<_> = layers
+            .par_iter()
+            .enumerate()
+            .filter(|(_, layer)| layer.len() >= self.options.parallel_threshold)
+            .map(|(layer_idx, layer)| {
+                let positions = self.calculate_layer_positions(igr, layer);
+                (layer_idx, positions)
+            })
+            .collect();
+
+        // Apply positions (must be sequential due to mutable access)
+        for (layer_idx, positions) in layer_positions {
+            for (&node_idx, &pos) in layers[layer_idx].iter().zip(positions.iter()) {
+                let node = &mut igr.graph[node_idx];
+                match self.options.direction {
+                    Direction::LeftRight | Direction::RightLeft => node.y = pos,
+                    Direction::TopBottom | Direction::BottomTop => node.x = pos,
+                }
+            }
+        }
+
+        // Handle smaller layers sequentially
+        for layer in layers.iter() {
+            if layer.len() < self.options.parallel_threshold && !layer.is_empty() {
+                self.position_layer_sequential(igr, layer);
+            }
+        }
+    }
+
+    // Calculate positions for a single layer
+    fn calculate_layer_positions(&self, igr: &IntermediateGraph, layer: &[NodeIndex]) -> Vec<f64> {
+        let mut positions = Vec::with_capacity(layer.len());
+        let total_width: f64 = layer
+            .iter()
+            .map(|&idx| match self.options.direction {
+                Direction::LeftRight | Direction::RightLeft => igr.graph[idx].height,
+                Direction::TopBottom | Direction::BottomTop => igr.graph[idx].width,
+            })
+            .sum();
+
+        let total_separation = self.options.node_sep * (layer.len() - 1) as f64;
+        let total_span = total_width + total_separation;
+        let mut current_pos = -total_span / 2.0;
+
+        for &node_idx in layer {
+            let dimension = match self.options.direction {
+                Direction::LeftRight | Direction::RightLeft => igr.graph[node_idx].height,
+                Direction::TopBottom | Direction::BottomTop => igr.graph[node_idx].width,
+            };
+            current_pos += dimension / 2.0;
+            positions.push(current_pos);
+            current_pos += dimension / 2.0 + self.options.node_sep;
+        }
+
+        positions
+    }
+
+    // Position a single layer sequentially
+    fn position_layer_sequential(&self, igr: &mut IntermediateGraph, layer: &[NodeIndex]) {
+        let positions = self.calculate_layer_positions(igr, layer);
+        for (&node_idx, &pos) in layer.iter().zip(positions.iter()) {
+            let node = &mut igr.graph[node_idx];
+            match self.options.direction {
+                Direction::LeftRight | Direction::RightLeft => node.y = pos,
+                Direction::TopBottom | Direction::BottomTop => node.x = pos,
+            }
+        }
+    }
+
+    // Sequential version (original implementation)
+    fn assign_node_positions_within_layers_sequential(
         &self,
         igr: &mut IntermediateGraph,
         layers: &[Vec<NodeIndex>],

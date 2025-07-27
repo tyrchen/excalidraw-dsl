@@ -1,4 +1,5 @@
 [default.extend-words]
+ba = "ba"
 
 [files]
 extend-exclude = ["CHANGELOG.md", "ui/*", "examples/*"]
