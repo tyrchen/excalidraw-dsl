@@ -1,5 +1,6 @@
 [default.extend-words]
 ba = "ba"
+strat = "strat"
 
 [files]
 extend-exclude = ["CHANGELOG.md", "ui/*", "examples/*"]

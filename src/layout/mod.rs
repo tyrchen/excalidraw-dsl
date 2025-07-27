@@ -6,6 +6,9 @@ mod force;
 mod manager;
 mod strategy;
 
+#[cfg(feature = "ml-layout")]
+pub mod ml;
+
 pub use cache::{CachedLayout, LayoutCacheKey};
 pub use dagre::{DagreLayout, DagreLayoutOptions, Direction, RankingAlgorithm};
 pub use elk::{ElkAlgorithm, ElkDirection, ElkLayout, ElkLayoutOptions, HierarchyHandling};
@@ -14,6 +17,9 @@ pub use manager::LayoutManager;
 pub use strategy::{
     AdaptiveStrategy, ComplexityHint, CompositeStrategy, LayoutContext, LayoutStrategy,
 };
+
+#[cfg(feature = "ml-layout")]
+pub use ml::{GraphFeatureExtractor, MLLayoutStrategy, MLStrategySelector, TrainingDataCollector};
 
 use crate::error::Result;
 use crate::igr::IntermediateGraph;

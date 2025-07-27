@@ -1,4 +1,6 @@
 // src/layout/manager.rs
+#[cfg(feature = "ml-layout")]
+use super::{AdaptiveStrategy, LayoutEngineAdapter, LayoutStrategy, MLLayoutStrategy};
 use super::{CachedLayout, DagreLayout, ElkLayout, ForceLayout, LayoutCacheKey, LayoutEngine};
 use crate::error::{LayoutError, Result};
 use crate::igr::IntermediateGraph;
@@ -35,6 +37,25 @@ impl LayoutManager {
         manager.register("dagre", Box::new(DagreLayout::new()));
         manager.register("force", Box::new(ForceLayout::new()));
         manager.register("elk", Box::new(ElkLayout::new()));
+
+        // Register ML layout if feature is enabled
+        #[cfg(feature = "ml-layout")]
+        {
+            // Create an adaptive strategy as fallback for ML
+            let adaptive_fallback = Arc::new(
+                AdaptiveStrategy::new()
+                    .add_strategy(Arc::new(LayoutEngineAdapter::new(DagreLayout::new())))
+                    .add_strategy(Arc::new(LayoutEngineAdapter::new(ForceLayout::new())))
+                    .add_strategy(Arc::new(LayoutEngineAdapter::new(ElkLayout::new()))),
+            );
+
+            // Create ML layout adapter
+            if let Ok(ml_strategy) = MLLayoutStrategy::new(adaptive_fallback) {
+                let ml_strategy_arc = Arc::new(ml_strategy);
+                manager.register("ml", Box::new(MLLayoutEngine(ml_strategy_arc.clone())));
+                manager.register("ml-enhanced", Box::new(MLLayoutEngine(ml_strategy_arc)));
+            }
+        }
 
         manager
     }
@@ -193,4 +214,21 @@ pub struct CacheStats {
     pub entries: usize,
     pub max_entries: usize,
     pub hit_rate: f64,
+}
+
+/// Adapter to use ML layout strategy as a layout engine
+#[cfg(feature = "ml-layout")]
+struct MLLayoutEngine(Arc<dyn LayoutStrategy>);
+
+#[cfg(feature = "ml-layout")]
+impl LayoutEngine for MLLayoutEngine {
+    fn layout(&self, igr: &mut IntermediateGraph) -> Result<()> {
+        use super::LayoutContext;
+        let context = LayoutContext::default();
+        self.0.apply(igr, &context)
+    }
+
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
 }
