@@ -15,7 +15,9 @@ const DEFAULT_STROKE_COLOR: &str = "#000000";
 const DEFAULT_FILL_STYLE: &str = "solid";
 const DEFAULT_STROKE_STYLE: &str = "solid";
 const TEXT_ALIGN_CENTER: &str = "center";
+const TEXT_ALIGN_LEFT: &str = "left";
 const VERTICAL_ALIGN_MIDDLE: &str = "middle";
+const VERTICAL_ALIGN_TOP: &str = "top";
 const ELEMENT_TYPE_RECTANGLE: &str = "rectangle";
 const ELEMENT_TYPE_ELLIPSE: &str = "ellipse";
 const ELEMENT_TYPE_DIAMOND: &str = "diamond";
@@ -265,10 +267,10 @@ impl ExcalidrawGenerator {
                 if let Some(label) = &group.label {
                     if !label.is_empty() {
                         if let Some(bounds) = &group.bounds {
-                            let text_element = Self::generate_text_element(
+                            let text_element = Self::generate_container_text_element(
                                 label,
-                                bounds.x + bounds.width / 2.0,
-                                bounds.y + 20.0, // Place text near top of group
+                                bounds.x + 10.0, // 10px padding from left edge
+                                bounds.y + 10.0, // 10px padding from top edge
                                 &group_id,
                                 group.attributes.font_size.unwrap_or(16.0),
                                 &group.attributes.font,
@@ -305,10 +307,10 @@ impl ExcalidrawGenerator {
                 if let Some(label) = &container.label {
                     if !label.is_empty() {
                         if let Some(bounds) = &container.bounds {
-                            let text_element = Self::generate_text_element(
+                            let text_element = Self::generate_container_text_element(
                                 label,
-                                bounds.x + bounds.width / 2.0,
-                                bounds.y + 20.0, // Place text near top of container
+                                bounds.x + 10.0, // 10px padding from left edge
+                                bounds.y + 10.0, // 10px padding from top edge
                                 &container_id,
                                 container.attributes.font_size.unwrap_or(16.0),
                                 &container.attributes.font,
@@ -852,6 +854,66 @@ impl ExcalidrawGenerator {
         let text_height = (font_size * 1.3).round() as i32; // Slightly more height for better appearance
 
         (text_width, text_height)
+    }
+
+    fn generate_container_text_element(
+        text: &str,
+        x: f64,
+        y: f64,
+        container_id: &str,
+        font_size: f64,
+        font: &Option<String>,
+    ) -> Result<ExcalidrawElementSkeleton> {
+        let font_family = Self::convert_font_family(font);
+        let (text_width, text_height) =
+            Self::calculate_text_dimensions(text, font_size, font_family);
+
+        // Position text at top-left (no centering)
+        let text_x = x.round() as i32;
+        let text_y = y.round() as i32;
+
+        Ok(ExcalidrawElementSkeleton {
+            r#type: ELEMENT_TYPE_TEXT.to_string(),
+            id: format!("text_{}", Uuid::new_v4()),
+            x: text_x,
+            y: text_y,
+            width: text_width,
+            height: text_height,
+            angle: 0,
+            stroke_color: DEFAULT_STROKE_COLOR.to_string(),
+            background_color: "transparent".to_string(),
+            fill_style: DEFAULT_FILL_STYLE.to_string(),
+            stroke_width: 0,
+            stroke_style: DEFAULT_STROKE_STYLE.to_string(),
+            roughness: 0,
+            opacity: 100,
+            text: Some(text.to_string()),
+            font_size: font_size.round() as i32,
+            font_family: Self::convert_font_family(font),
+            start_binding: None,
+            end_binding: None,
+            start_arrowhead: None,
+            end_arrowhead: None,
+            points: None,
+            seed: rand::random::<i32>().abs(),
+            version: 1,
+            version_nonce: rand::random::<i32>().abs(),
+            is_deleted: false,
+            group_ids: vec![],
+            frame_id: None,
+            roundness: None,
+            bound_elements: vec![],
+            updated: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                .as_millis() as u64,
+            link: None,
+            locked: false,
+            container_id: Some(container_id.to_string()),
+            text_align: Some(TEXT_ALIGN_LEFT.to_string()),
+            vertical_align: Some(VERTICAL_ALIGN_TOP.to_string()),
+            is_container: None,
+        })
     }
 
     fn generate_text_element(

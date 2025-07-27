@@ -104,14 +104,16 @@ impl LayoutEngine for ElkLayout {
 
 impl ElkLayout {
     fn layered_layout(&self, igr: &mut IntermediateGraph) -> Result<()> {
-        // Enhanced layered layout with ELK-style improvements
-        let mut layers = self.build_layers_elk(igr)?;
+        // First, layout nodes that are in containers separately
+        self.layout_containers_separately(igr)?;
 
-        // Apply ELK-style crossing minimization
-        self.minimize_crossings_elk(igr, &mut layers);
-
-        // Position nodes with ELK spacing
-        self.position_nodes_elk(igr, &layers)?;
+        // Then layout top-level nodes
+        let top_level_nodes = self.get_top_level_nodes(igr);
+        if !top_level_nodes.is_empty() {
+            let mut layers = self.build_layers_for_nodes(igr, &top_level_nodes)?;
+            self.minimize_crossings_elk(igr, &mut layers);
+            self.position_nodes_elk(igr, &layers)?;
+        }
 
         Ok(())
     }
@@ -172,6 +174,7 @@ impl ElkLayout {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn build_layers_elk(&self, igr: &IntermediateGraph) -> Result<Vec<Vec<NodeIndex>>> {
         // Enhanced layering with ELK algorithms
         let node_ranks = self.calculate_node_ranks_elk(igr)?;
@@ -333,37 +336,45 @@ impl ElkLayout {
         igr: &mut IntermediateGraph,
         layers: &[Vec<NodeIndex>],
     ) -> Result<()> {
-        let layer_spacing = 150.0;
-        let node_spacing = self.options.spacing_node_node;
+        self.position_nodes_elk_with_offset(igr, layers, 0.0, 0.0)
+    }
+
+    fn position_nodes_elk_with_offset(
+        &self,
+        igr: &mut IntermediateGraph,
+        layers: &[Vec<NodeIndex>],
+        offset_x: f64,
+        offset_y: f64,
+    ) -> Result<()> {
+        let layer_spacing = 180.0; // Increased layer spacing
+        let base_node_spacing = self.options.spacing_node_node.max(30.0); // Minimum 30px spacing
 
         // Position layers
         for (layer_idx, layer) in layers.iter().enumerate() {
-            let x = layer_idx as f64 * layer_spacing;
-
-            // Calculate total height needed for this layer
-            let total_height: f64 = layer.iter().map(|&idx| igr.graph[idx].height).sum::<f64>()
-                + (layer.len().saturating_sub(1)) as f64 * node_spacing;
-
-            let mut y = -total_height / 2.0;
+            let x = offset_x + layer_idx as f64 * layer_spacing;
+            let mut y = offset_y;
 
             for &node_idx in layer {
                 let node = &mut igr.graph[node_idx];
 
+                // Calculate dynamic spacing based on node size
+                let node_spacing = base_node_spacing + (node.height * 0.1);
+
                 match self.options.direction {
                     ElkDirection::Right => {
                         node.x = x;
-                        node.y = y + node.height / 2.0;
+                        node.y = y;
                     }
                     ElkDirection::Down => {
-                        node.x = y + node.width / 2.0;
+                        node.x = y;
                         node.y = x;
                     }
                     ElkDirection::Left => {
                         node.x = -x;
-                        node.y = y + node.height / 2.0;
+                        node.y = y;
                     }
                     ElkDirection::Up => {
-                        node.x = y + node.width / 2.0;
+                        node.x = y;
                         node.y = -x;
                     }
                 }
@@ -767,5 +778,214 @@ impl ElkLayout {
                 node.y += shift_y;
             }
         }
+    }
+
+    fn get_top_level_nodes(&self, igr: &IntermediateGraph) -> Vec<NodeIndex> {
+        // Get all nodes that are not in any container
+        let mut nodes_in_containers = HashSet::new();
+        for container in &igr.containers {
+            for &node_idx in &container.children {
+                nodes_in_containers.insert(node_idx);
+            }
+        }
+
+        igr.graph
+            .node_indices()
+            .filter(|idx| !nodes_in_containers.contains(idx))
+            .collect()
+    }
+
+    fn layout_containers_separately(&self, igr: &mut IntermediateGraph) -> Result<()> {
+        let container_count = igr.containers.len();
+        let mut container_info = Vec::new();
+        let padding = 30.0;
+
+        // First pass: Layout nodes within each container and calculate dimensions
+        for container_idx in 0..container_count {
+            let container_children = igr.containers[container_idx].children.clone();
+            if container_children.is_empty() {
+                container_info.push((0.0, 0.0, 0.0, 0.0));
+                continue;
+            }
+
+            // Build layers for just this container's nodes
+            let mut layers = self.build_layers_for_nodes(igr, &container_children)?;
+            self.minimize_crossings_elk(igr, &mut layers);
+
+            // Position nodes with better spacing
+            self.position_nodes_elk_with_offset(igr, &layers, 50.0, 50.0)?;
+
+            // Normalize positions within container to eliminate negative coordinates
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+
+            for &node_idx in &container_children {
+                let node = &igr.graph[node_idx];
+                min_x = min_x.min(node.x);
+                min_y = min_y.min(node.y);
+            }
+
+            // Ensure minimum margins and normalize to start from (0,0)
+            let margin = 20.0;
+            let normalize_x = margin - min_x.min(margin);
+            let normalize_y = margin - min_y.min(margin);
+
+            for &node_idx in &container_children {
+                let node = &mut igr.graph[node_idx];
+                node.x += normalize_x;
+                node.y += normalize_y;
+            }
+
+            // Calculate final bounding box after normalization
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
+
+            for &node_idx in &container_children {
+                let node = &igr.graph[node_idx];
+                min_x = min_x.min(node.x);
+                min_y = min_y.min(node.y);
+                max_x = max_x.max(node.x + node.width);
+                max_y = max_y.max(node.y + node.height);
+            }
+
+            let width = max_x - min_x + 2.0 * padding;
+            let height = max_y - min_y + 2.0 * padding;
+            container_info.push((min_x, min_y, width, height));
+        }
+
+        // Second pass: Arrange containers in a grid with improved spacing
+        let cols = ((container_count as f64).sqrt().ceil() as usize).max(1);
+        let container_spacing = 80.0; // Increased spacing
+        let global_padding = 60.0; // Increased global padding
+
+        // Pre-calculate row heights for better grid arrangement
+        let rows = container_count.div_ceil(cols);
+        let mut row_heights = vec![0.0; rows];
+
+        #[allow(clippy::needless_range_loop)]
+        for container_idx in 0..container_count {
+            let (_, _, _, height) = container_info[container_idx];
+            let row = container_idx / cols;
+            if row < row_heights.len() {
+                let current_height: f64 = row_heights[row];
+                row_heights[row] = current_height.max(height);
+            }
+        }
+
+        for container_idx in 0..container_count {
+            let (min_x, min_y, width, height) = container_info[container_idx];
+            if width == 0.0 && height == 0.0 {
+                continue; // Skip empty containers
+            }
+
+            let row = container_idx / cols;
+            let col = container_idx % cols;
+
+            // Calculate target position for this container
+            let mut target_x = global_padding;
+            let mut target_y = global_padding;
+
+            // Add widths of previous containers in this row
+            for c in 0..col {
+                let idx = row * cols + c;
+                if idx < container_info.len() {
+                    target_x += container_info[idx].2 + container_spacing;
+                }
+            }
+
+            // Add heights of previous rows
+            for r in 0..row {
+                if r < row_heights.len() {
+                    target_y += row_heights[r] + container_spacing;
+                }
+            }
+
+            // Calculate the final offset needed to move container to target position
+            let offset_x = target_x + padding - min_x;
+            let offset_y = target_y + padding - min_y;
+
+            // Apply offset to all nodes in this container
+            for &node_idx in &igr.containers[container_idx].children {
+                let node = &mut igr.graph[node_idx];
+                node.x += offset_x;
+                node.y += offset_y;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn build_layers_for_nodes(
+        &self,
+        igr: &IntermediateGraph,
+        nodes: &[NodeIndex],
+    ) -> Result<Vec<Vec<NodeIndex>>> {
+        // Build layers only for the specified nodes
+        let nodes_set: HashSet<NodeIndex> = nodes.iter().cloned().collect();
+
+        // Calculate ranks for these nodes
+        let mut ranks = HashMap::new();
+        for &node in nodes {
+            let rank = self.calculate_node_rank_within_set(igr, node, &nodes_set);
+            ranks.insert(node, rank);
+        }
+
+        // Group by rank
+        let mut layers_map: HashMap<i32, Vec<NodeIndex>> = HashMap::new();
+        for (&node, &rank) in ranks.iter() {
+            layers_map.entry(rank).or_insert_with(Vec::new).push(node);
+        }
+
+        // Convert to sorted layers
+        let max_rank = layers_map.keys().max().copied().unwrap_or(0);
+        let layers: Vec<Vec<NodeIndex>> = (0..=max_rank)
+            .map(|r| layers_map.get(&r).cloned().unwrap_or_default())
+            .filter(|layer| !layer.is_empty())
+            .collect();
+
+        Ok(layers)
+    }
+
+    fn calculate_node_rank_within_set(
+        &self,
+        igr: &IntermediateGraph,
+        node: NodeIndex,
+        nodes_set: &HashSet<NodeIndex>,
+    ) -> i32 {
+        // Calculate rank using a topological approach to avoid deep recursion
+        let mut ranks = HashMap::new();
+        let mut visited = HashSet::new();
+        let mut stack = vec![(node, false)];
+
+        while let Some((current, processed)) = stack.pop() {
+            if processed {
+                // Calculate rank based on predecessors
+                let mut max_pred_rank = -1;
+                for edge in igr.graph.edges_directed(current, PetDirection::Incoming) {
+                    let source = edge.source();
+                    if nodes_set.contains(&source) {
+                        if let Some(&rank) = ranks.get(&source) {
+                            max_pred_rank = max_pred_rank.max(rank);
+                        }
+                    }
+                }
+                ranks.insert(current, max_pred_rank + 1);
+            } else if visited.insert(current) {
+                // Process this node after its predecessors
+                stack.push((current, true));
+
+                // Add predecessors to stack
+                for edge in igr.graph.edges_directed(current, PetDirection::Incoming) {
+                    let source = edge.source();
+                    if nodes_set.contains(&source) && !visited.contains(&source) {
+                        stack.push((source, false));
+                    }
+                }
+            }
+        }
+
+        *ranks.get(&node).unwrap_or(&0)
     }
 }
