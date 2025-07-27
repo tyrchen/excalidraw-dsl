@@ -58,7 +58,8 @@ fn build_document(pairs: pest::iterators::Pairs<Rule>) -> Result<ParsedDocument>
                                     nodes.push(parse_node_definition(stmt_pair)?);
                                 }
                                 Rule::edge_def => {
-                                    edges.push(parse_edge_definition(stmt_pair)?);
+                                    let parsed_edges = parse_edge_definition(stmt_pair)?;
+                                    edges.extend(parsed_edges);
                                 }
                                 Rule::container_def => {
                                     containers.push(parse_container_definition(stmt_pair)?);
@@ -156,7 +157,18 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement> {
 
     match inner.as_rule() {
         Rule::node_def => Ok(Statement::Node(parse_node_definition(inner)?)),
-        Rule::edge_def => Ok(Statement::Edge(parse_edge_definition(inner)?)),
+        Rule::edge_def => {
+            // Edge chains need special handling since they expand to multiple edges
+            let edges = parse_edge_definition(inner)?;
+            if edges.len() == 1 {
+                Ok(Statement::Edge(edges.into_iter().next().unwrap()))
+            } else {
+                // For now, return the first edge and log a warning
+                // A more complete solution would require changing Statement to support multiple edges
+                log::warn!("Edge chain in container/group context - only first edge will be used");
+                Ok(Statement::Edge(edges.into_iter().next().unwrap()))
+            }
+        }
         Rule::container_def => Ok(Statement::Container(parse_container_definition(inner)?)),
         Rule::group_def => Ok(Statement::Group(parse_group_definition(inner)?)),
         _ => Err(ParseError::Syntax {
@@ -276,14 +288,14 @@ fn parse_node_definition(pair: pest::iterators::Pair<Rule>) -> Result<NodeDefini
     })
 }
 
-fn parse_edge_definition(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition> {
+fn parse_edge_definition(pair: pest::iterators::Pair<Rule>) -> Result<Vec<EdgeDefinition>> {
     let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
         line: 0,
         message: "Expected edge content".to_string(),
     })?;
 
     match inner.as_rule() {
-        Rule::single_edge => parse_single_edge(inner),
+        Rule::single_edge => Ok(vec![parse_single_edge(inner)?]),
         Rule::edge_chain => parse_edge_chain(inner),
         _ => Err(ParseError::Syntax {
             line: 0,
@@ -368,7 +380,7 @@ fn parse_single_edge(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition
     })
 }
 
-fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition> {
+fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<Vec<EdgeDefinition>> {
     // Parse edge chain and expand into multiple edges
     let mut ids = Vec::new();
     let mut arrow_type = ArrowType::SingleArrow;
@@ -407,16 +419,19 @@ fn parse_edge_chain(pair: pest::iterators::Pair<Rule>) -> Result<EdgeDefinition>
     }
 
     if ids.len() >= 2 {
-        // For now, return the first edge in the chain
-        // The expansion will be handled in the EdgeChain structure
-        Ok(EdgeDefinition {
-            from: ids[0].clone(),
-            to: ids[1].clone(),
-            label,
-            arrow_type,
-            attributes,
-            style: None,
-        })
+        // Expand the edge chain into individual edges
+        let mut edges = Vec::new();
+        for i in 0..(ids.len() - 1) {
+            edges.push(EdgeDefinition {
+                from: ids[i].clone(),
+                to: ids[i + 1].clone(),
+                label: label.clone(),
+                arrow_type,
+                attributes: attributes.clone(),
+                style: None,
+            });
+        }
+        Ok(edges)
     } else {
         Err(ParseError::Syntax {
             line: 0,
@@ -458,26 +473,45 @@ fn parse_group_definition(pair: pest::iterators::Pair<Rule>) -> Result<GroupDefi
                 attributes = parse_style_block(style_block)?;
             }
             Rule::statement => {
-                let statement = parse_statement(inner_pair)?;
+                // Check what kind of statement this is
+                let stmt_inner = inner_pair.clone().into_inner().next().unwrap();
+                match stmt_inner.as_rule() {
+                    Rule::edge_def => {
+                        // Handle edge definitions specially to support chains
+                        let edges = parse_edge_definition(stmt_inner)?;
+                        for edge in edges {
+                            // Track children
+                            if !children.contains(&edge.from) {
+                                children.push(edge.from.clone());
+                            }
+                            if !children.contains(&edge.to) {
+                                children.push(edge.to.clone());
+                            }
+                            internal_statements.push(Statement::Edge(edge));
+                        }
+                    }
+                    _ => {
+                        // For non-edge statements, use normal parsing
+                        let statement = parse_statement(inner_pair)?;
 
-                // Collect child node IDs
-                match &statement {
-                    Statement::Node(node) => {
-                        children.push(node.id.clone());
-                    }
-                    Statement::Edge(edge) => {
-                        // Ensure both nodes are tracked as children
-                        if !children.contains(&edge.from) {
-                            children.push(edge.from.clone());
+                        match &statement {
+                            Statement::Node(node) => {
+                                children.push(node.id.clone());
+                            }
+                            Statement::Edge(edge) => {
+                                if !children.contains(&edge.from) {
+                                    children.push(edge.from.clone());
+                                }
+                                if !children.contains(&edge.to) {
+                                    children.push(edge.to.clone());
+                                }
+                            }
+                            _ => {}
                         }
-                        if !children.contains(&edge.to) {
-                            children.push(edge.to.clone());
-                        }
+
+                        internal_statements.push(statement);
                     }
-                    _ => {}
                 }
-
-                internal_statements.push(statement);
             }
             _ => {}
         }
@@ -546,26 +580,45 @@ fn parse_container_definition(pair: pest::iterators::Pair<Rule>) -> Result<Conta
                 attributes = parse_style_block(style_block)?;
             }
             Rule::statement => {
-                let statement = parse_statement(inner_pair)?;
+                // Check what kind of statement this is
+                let stmt_inner = inner_pair.clone().into_inner().next().unwrap();
+                match stmt_inner.as_rule() {
+                    Rule::edge_def => {
+                        // Handle edge definitions specially to support chains
+                        let edges = parse_edge_definition(stmt_inner)?;
+                        for edge in edges {
+                            // Track children
+                            if !children.contains(&edge.from) {
+                                children.push(edge.from.clone());
+                            }
+                            if !children.contains(&edge.to) {
+                                children.push(edge.to.clone());
+                            }
+                            internal_statements.push(Statement::Edge(edge));
+                        }
+                    }
+                    _ => {
+                        // For non-edge statements, use normal parsing
+                        let statement = parse_statement(inner_pair)?;
 
-                // Collect child node IDs
-                match &statement {
-                    Statement::Node(node) => {
-                        children.push(node.id.clone());
-                    }
-                    Statement::Edge(edge) => {
-                        // Ensure both nodes are tracked as children
-                        if !children.contains(&edge.from) {
-                            children.push(edge.from.clone());
+                        match &statement {
+                            Statement::Node(node) => {
+                                children.push(node.id.clone());
+                            }
+                            Statement::Edge(edge) => {
+                                if !children.contains(&edge.from) {
+                                    children.push(edge.from.clone());
+                                }
+                                if !children.contains(&edge.to) {
+                                    children.push(edge.to.clone());
+                                }
+                            }
+                            _ => {}
                         }
-                        if !children.contains(&edge.to) {
-                            children.push(edge.to.clone());
-                        }
+
+                        internal_statements.push(statement);
                     }
-                    _ => {}
                 }
-
-                internal_statements.push(statement);
             }
             _ => {}
         }

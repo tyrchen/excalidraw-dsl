@@ -14,7 +14,6 @@ fn compile_to_json(edsl: &str) -> Result<Value> {
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_simple_edge_chain() {
     let edsl = r#"
 a[A]
@@ -47,7 +46,6 @@ a -> b -> c -> d
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_edge_chain_with_label() {
     let edsl = r#"
 start[Start]
@@ -91,7 +89,6 @@ start -> step1 -> step2 -> end: "Process Flow"
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_mixed_edge_types_in_chain() {
     let edsl = r#"
 a[A]
@@ -122,7 +119,6 @@ a -> b -- c <-> d
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_edge_chain_with_attributes() {
     let edsl = r#"
 a[A]
@@ -147,7 +143,6 @@ a -> b -> c
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_long_edge_chain() {
     let edsl = r#"
 n1[Node 1]
@@ -176,7 +171,6 @@ n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_multiple_edge_chains() {
     let edsl = r#"
 # First chain
@@ -215,7 +209,6 @@ c -> x
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_edge_chain_with_branches() {
     let edsl = r#"
 start[Start]
@@ -246,7 +239,6 @@ a -> c -> end
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_edge_chain_in_container() {
     let edsl = r#"
 container "Process" {
@@ -279,7 +271,6 @@ external -> step1
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_bidirectional_edge_chain() {
     let edsl = r#"
 a[A]
@@ -310,7 +301,6 @@ a <-> b <-> c <-> d
 }
 
 #[test]
-#[ignore = "Edge chain expansion not yet implemented"]
 fn test_edge_chain_error_undefined_node() {
     let edsl = r#"
 a[A]
