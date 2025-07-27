@@ -1,0 +1,138 @@
+---
+layout: elk
+theme: light
+---
+
+# Routing Showcase - Demonstrating all routing algorithms
+
+# Define containers with nodes
+container "Straight Routing" {
+    s1[Service 1]
+    s2[Service 2]
+}
+
+container "Orthogonal Routing" {
+    o1[Origin]
+    o2[Target]
+    o3[Side Node]
+}
+
+container "Curved Routing" {
+    c1[Start]
+    c2[End]
+    c3[Alternative]
+}
+
+container "Auto Routing" {
+    hub[Central Hub]
+    n1[Node 1]
+    n2[Node 2]
+    n3[Node 3]
+    n4[Node 4]
+}
+
+# Straight routing demo
+connection {
+    from: "s1";
+    to: "s2";
+    style {
+        type: arrow;
+        label: "Straight";
+        routing: straight;
+        color: "#F44336";
+        width: 3;
+    }
+}
+
+# Orthogonal routing demos
+connection {
+    from: "o1";
+    to: "o2";
+    style {
+        type: arrow;
+        label: "Right Angles";
+        routing: orthogonal;
+        color: "#2196F3";
+        width: 3;
+    }
+}
+
+connection {
+    from: "o1";
+    to: "o3";
+    style {
+        type: arrow;
+        label: "Manhattan";
+        routing: orthogonal;
+        color: "#03A9F4";
+        width: 2;
+    }
+}
+
+# Curved routing demos
+connection {
+    from: "c1";
+    to: "c2";
+    style {
+        type: arrow;
+        label: "Bezier Curve";
+        routing: curved;
+        color: "#4CAF50";
+        width: 3;
+    }
+}
+
+connection {
+    from: "c2";
+    to: "c3";
+    style {
+        type: arrow;
+        routing: curved;
+        color: "#8BC34A";
+        width: 2;
+    }
+}
+
+# Auto routing with multiple targets
+connections {
+    from: "hub";
+    to: ["n1", "n2", "n3", "n4"];
+    style {
+        type: arrow;
+        routing: auto;
+        color: "#9C27B0";
+        width: 2;
+    }
+}
+
+# Cross-container connections
+connection {
+    from: "s2";
+    to: "o1";
+    style {
+        type: dashed;
+        label: "Cross-Link";
+        routing: orthogonal;
+        color: "#FF9800";
+    }
+}
+
+connection {
+    from: "o3";
+    to: "c1";
+    style {
+        type: arrow;
+        routing: curved;
+        color: "#795548";
+    }
+}
+
+connection {
+    from: "c3";
+    to: "hub";
+    style {
+        type: arrow;
+        routing: auto;
+        color: "#607D8B";
+    }
+}

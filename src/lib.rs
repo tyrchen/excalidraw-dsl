@@ -8,6 +8,7 @@ pub mod generator;
 pub mod igr;
 pub mod layout;
 pub mod parser;
+pub mod routing;
 
 #[cfg(feature = "llm")]
 pub mod llm;

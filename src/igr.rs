@@ -30,6 +30,7 @@ pub struct EdgeData {
     pub label: Option<String>,
     pub arrow_type: ArrowType,
     pub attributes: ExcalidrawAttributes,
+    pub routing_type: Option<crate::ast::RoutingType>,
 }
 
 #[derive(Debug, Clone)]
@@ -508,6 +509,7 @@ impl EdgeData {
                 .or(def.style.as_ref().and_then(|s| s.label.clone())),
             arrow_type: def.arrow_type,
             attributes,
+            routing_type: def.style.as_ref().and_then(|s| s.routing),
         })
     }
 
@@ -570,6 +572,7 @@ impl EdgeData {
                 label: style.label.clone(),
                 arrow_type,
                 attributes,
+                routing_type: style.routing,
             };
 
             edges.push((from_idx, to_idx, edge_data));

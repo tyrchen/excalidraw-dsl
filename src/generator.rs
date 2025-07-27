@@ -2,6 +2,7 @@
 use crate::ast::{ArrowType, ArrowheadType, FillStyle, GroupType, StrokeStyle};
 use crate::error::{GeneratorError, Result};
 use crate::igr::{ContainerData, EdgeData, GroupData, IntermediateGraph, NodeData};
+use crate::routing::EdgeRouter;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -591,13 +592,13 @@ impl ExcalidrawGenerator {
                     _ => None,
                 },
             ),
-            points: Some(vec![
-                [0, 0],
-                [
-                    (end_point.0 - start_point.0).round() as i32,
-                    (end_point.1 - start_point.1).round() as i32,
-                ],
-            ]),
+            points: Some(EdgeRouter::route_edge(
+                start_point,
+                end_point,
+                source_node,
+                target_node,
+                edge_data.routing_type,
+            )),
             seed: rand::random::<i32>().abs(),
             version: 1,
             version_nonce: rand::random::<i32>().abs(),
