@@ -1,17 +1,27 @@
-# ExcaliDraw-DSL (EDSL)
+# Excalidraw DSL
 
-A domain-specific language for generating [Excalidraw](https://excalidraw.com/) diagrams. EDSL combines the simplicity of Mermaid-style syntax with native Excalidraw visual properties and hand-drawn aesthetics.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Crates.io](https://img.shields.io/crates/v/excalidraw-dsl.svg)](https://crates.io/crates/excalidraw-dsl)
 
-## Features
+A powerful domain-specific language (DSL) for generating [Excalidraw](https://excalidraw.com/) diagrams using text. Write diagrams as code and get beautiful, hand-drawn style visualizations.
 
-- **Declarative Syntax**: Focus on "what" to draw, not "how" to draw it
-- **Excalidraw-Native**: First-class support for Excalidraw's unique visual properties (roughness, fill styles, fonts)
-- **Container Support**: Powerful grouping and hierarchical organization
-- **Multiple Layout Algorithms**: Dagre (hierarchical) and Force-directed layouts
-- **Progressive Complexity**: Simple basics, powerful advanced features
-- **CLI and Library**: Use as a command-line tool or integrate into your applications
+[中文文档](./README-zh.md) | [Tutorial](./tutorial/README.md) | [Examples](./examples/)
 
-## Installation
+## ✨ Features
+
+- 📝 **Simple Text Syntax** - Write diagrams using intuitive text commands
+- 🎨 **Automatic Layouts** - Multiple layout algorithms (Dagre, Force, ELK)
+- 🎯 **Smart Styling** - Consistent styling with component types and themes
+- 📦 **Containers & Groups** - Organize complex diagrams with hierarchical structures
+- 🔄 **Live Preview** - Built-in web server with real-time updates
+- 🚀 **Fast Compilation** - Instant diagram generation
+- 🎭 **Hand-drawn Style** - Beautiful Excalidraw aesthetics
+- 🌈 **Full Styling Control** - Colors, fonts, line styles, and more
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 # Install from source
@@ -19,321 +29,282 @@ git clone https://github.com/yourusername/excalidraw-dsl
 cd excalidraw-dsl
 cargo install --path .
 
-# Or build locally
-cargo build --release
+# Or install from crates.io (when published)
+cargo install excalidraw-dsl
 ```
 
-## Quick Start
+### Your First Diagram
 
-### Basic Usage
+Create a file `hello.edsl`:
 
-Create a simple diagram:
-
-```edsl
-# simple.edsl
-user[User] -> web[Web Server] -> db[Database] {
-  shape: cylinder;
-  fill: hachure;
-}
+```
+start "Hello"
+world "World"
+start -> world
 ```
 
-Compile to Excalidraw JSON:
+Compile it:
 
 ```bash
-edsl simple.edsl -o diagram.json
+edsl hello.edsl -o hello.excalidraw
 ```
 
-### EDSL Syntax
+Open `hello.excalidraw` in [Excalidraw](https://excalidraw.com/) and see your diagram!
 
-#### Global Configuration
+## 📖 Language Overview
 
-```edsl
----
-layout: dagre              # Layout algorithm (dagre, force)
-theme: dark               # Theme (light, dark)
-font: Virgil              # Font family
-sketchiness: 2            # Hand-drawn appearance (0-2)
----
-```
-
-#### Node Definitions
+### Basic Syntax
 
 ```edsl
-# Basic node
-web_server
+# Comments start with #
 
-# Node with label
-web_server[Web Server]
+# Nodes
+node_id "Node Label"
 
-# Node with styling
-db_server[Database] {
-  shape: cylinder;
-  fill: hachure;
-  fillWeight: 2;
-  strokeColor: '#868e96';
-  roughness: 2;
-  backgroundColor: '#f8f9fa';
-}
-```
+# Edges
+source -> target
+source -> target "Edge Label"
 
-#### Edge Definitions
-
-```edsl
-# Basic connection
-user -> api_gateway
-
-# Labeled connection
-user -> api_gateway: "HTTP Request"
-
-# Styled connection
-user -> api_gateway: "POST /data" {
-  strokeStyle: dotted;
-  startArrowhead: dot;
-  endArrowhead: triangle;
-  strokeColor: '#ff6b35';
+# Containers
+container name "Container Label" {
+    node1 "Node 1"
+    node2 "Node 2"
+    node1 -> node2
 }
 
-# Chain connections
-A -> B -> C -> D
-```
-
-#### Container Definitions
-
-```edsl
-container "Backend Services" as backend {
-  style: {
-    labelPosition: top;
-    backgroundColor: '#f8f9fa';
-    roughness: 0;
-    strokeStyle: dashed;
-  }
-  
-  api_gateway[API Gateway]
-  user_service[User Service]
-  auth_service[Auth Service]
-  
-  api_gateway -> user_service;
-  api_gateway -> auth_service;
-}
-
-# External connections to containers
-frontend -> backend.api_gateway;
-```
-
-### Visual Properties
-
-#### Shape Types
-- `rectangle` (default)
-- `ellipse`
-- `diamond`
-- `cylinder`
-- `text`
-
-#### Stroke Properties
-- `strokeColor`: Color hex code
-- `strokeWidth`: Line thickness
-- `strokeStyle`: solid, dotted, dashed
-
-#### Fill Properties
-- `backgroundColor`: Fill color
-- `fill`: none, solid, hachure, cross-hatch
-- `fillWeight`: Hachure density (1-5)
-
-#### Excalidraw-Specific
-- `roughness`: 0 (precise) to 2 (very rough)
-- `font`: Virgil, Helvetica, Cascadia
-
-## CLI Usage
-
-The `edsl` command provides several subcommands for different workflows:
-
-### Convert (Compile)
-
-Convert EDSL files to Excalidraw JSON:
-
-```bash
-# Basic conversion (outputs to input.json)
-edsl convert diagram.edsl
-
-# Specify output file
-edsl convert diagram.edsl -o output.json
-
-# Choose layout algorithm
-edsl convert diagram.edsl --layout force
-
-# Verbose output
-edsl convert diagram.edsl -v
-
-# Alias: compile
-edsl compile diagram.edsl
-```
-
-### Validate
-
-Check EDSL syntax without generating output:
-
-```bash
-# Validate syntax
-edsl validate diagram.edsl
-
-# Verbose validation (shows element counts)
-edsl validate diagram.edsl -v
-```
-
-### Watch
-
-Watch EDSL file for changes and recompile automatically:
-
-```bash
-# Watch and auto-compile
-edsl watch diagram.edsl
-
-# Specify output file
-edsl watch diagram.edsl -o output.json
-
-# Verbose mode
-edsl watch diagram.edsl -v
-```
-
-### Server
-
-Run HTTP/WebSocket server for real-time compilation:
-
-```bash
-# Start server on default port (3002)
-edsl server
-
-# Specify port
-edsl server --port 8080
-
-# Specify host
-edsl server --host 127.0.0.1
-
-# Verbose logging
-edsl server -v
-```
-
-### Usage Examples
-
-```bash
-# Convert all examples
-make examples
-
-# Run server and UI together
-make run-full
-
-# Install globally
-cargo install --path . --features server
-```
-
-## Library Usage
-
-```rust
-use excalidraw_dsl::EDSLCompiler;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let edsl_source = r#"
-    ---
-    layout: dagre
-    ---
-    
-    user[User] -> api[API] -> db[Database]
-    "#;
-    
-    let compiler = EDSLCompiler::new();
-    let json_output = compiler.compile(edsl_source)?;
-    
-    println!("{}", json_output);
-    Ok(())
+# Styling
+styled_node "Styled Node" {
+    backgroundColor: "#ff6b6b"
+    textColor: "#ffffff"
 }
 ```
 
 ### Advanced Features
 
-#### LLM Layout Optimization (Optional)
+#### Component Types
 
-Enable AI-powered layout optimization:
+Define reusable styles:
 
-```rust
-use excalidraw_dsl::EDSLCompiler;
+```yaml
+---
+component_types:
+  service:
+    backgroundColor: "#e3f2fd"
+    strokeColor: "#1976d2"
+  database:
+    backgroundColor: "#fce4ec"
+    strokeColor: "#c2185b"
+---
 
-let compiler = EDSLCompiler::new()
-    .with_llm_optimization("your-openai-api-key".to_string());
-    
-let optimized_output = compiler.compile(edsl_source)?;
+auth "Auth Service" @service
+userDB "User Database" @database
+auth -> userDB
 ```
 
-## Examples
+#### Templates
 
-See the `examples/` directory for more complex diagrams:
+Create reusable components:
 
-- `examples/simple.edsl` - Basic three-tier architecture
-- `examples/containers.edsl` - Using containers and grouping
-- `examples/styling.edsl` - Advanced styling examples
+```yaml
+---
+templates:
+  microservice:
+    api: "$name API"
+    db: "$name DB"
+    cache: "$name Cache"
+    edges:
+      - api -> db
+      - api -> cache
+---
 
-## Architecture
-
-EDSL follows a clean pipeline architecture:
-
+microservice user_service {
+    name: "User"
+}
 ```
-EDSL Source → Parser → IGR → Layout Engine → Generator → Excalidraw JSON
-                      ↓
-                 Validation
+
+#### Layout Algorithms
+
+Choose from multiple layout engines:
+
+```yaml
+---
+layout: dagre  # Options: dagre, force, elk
+layout_options:
+  rankdir: "TB"  # Top-bottom, LR, RL, BT
+  nodesep: 100
+  ranksep: 150
+---
 ```
 
-1. **Parser**: pest-based grammar parser
-2. **IGR**: Intermediate Graph Representation using petgraph
-3. **Layout Engine**: Multiple algorithms (Dagre, Force-directed)
-4. **Generator**: ExcalidrawElementSkeleton generation
-5. **Validation**: Comprehensive error checking
+## 🎯 Real-World Example
 
-## Development
+```yaml
+---
+layout: dagre
+component_types:
+  service:
+    backgroundColor: "#e8f5e9"
+    strokeColor: "#2e7d32"
+  database:
+    backgroundColor: "#e3f2fd"
+    strokeColor: "#1565c0"
+    roundness: 2
+---
 
-### Building
+# Microservices Architecture
+gateway "API Gateway" @service
+
+container services "Microservices" {
+    auth "Auth Service" @service
+    user "User Service" @service
+    order "Order Service" @service
+    payment "Payment Service" @service
+}
+
+container databases "Databases" {
+    authDB "Auth DB" @database
+    userDB "User DB" @database
+    orderDB "Order DB" @database
+}
+
+queue "Message Queue" {
+    backgroundColor: "#fff3e0"
+    strokeColor: "#e65100"
+}
+
+# Connections
+gateway -> auth
+gateway -> user
+gateway -> order
+
+auth -> authDB
+user -> userDB
+order -> orderDB
+
+order -> payment "Process Payment"
+payment -> queue "Payment Events"
+```
+
+## 🛠️ CLI Usage
 
 ```bash
-# Development build
-cargo build
+# Basic compilation
+edsl input.edsl -o output.excalidraw
 
-# Release build
-cargo build --release
+# Watch mode - auto-recompile on changes
+edsl input.edsl -o output.excalidraw --watch
+
+# Start web server for live preview
+edsl --server
+# Visit http://localhost:3030
+
+# Validate syntax without output
+edsl input.edsl --validate
+
+# Use specific layout algorithm
+edsl input.edsl -o output.excalidraw --layout elk
+```
+
+### All Options
+
+```
+Usage: edsl [OPTIONS] [INPUT]
+
+Arguments:
+  [INPUT]  Input .edsl file
+
+Options:
+  -o, --output <OUTPUT>       Output file path
+  -l, --layout <LAYOUT>       Layout algorithm [default: dagre]
+                             Possible values: dagre, force, elk
+  -w, --watch                Watch for file changes
+  -s, --server               Start web server
+  -p, --port <PORT>          Server port [default: 3030]
+  -v, --validate             Validate only
+      --watch-delay <MS>      Delay before recompiling [default: 100]
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+## 📚 Documentation
+
+- 📖 **[Tutorial](./tutorial/README.md)** - Step-by-step guide for beginners
+- 🌏 **[中文教程](./tutorial/README-zh.md)** - Chinese tutorial
+- 📝 **[Language Reference](./docs/language-reference.md)** - Complete syntax reference
+- 🎨 **[Examples](./examples/)** - Sample diagrams and patterns
+- 🏗️ **[Architecture](./docs/architecture.md)** - Technical documentation
+
+## 🧩 Examples
+
+Check out the [examples directory](./examples/) for more complex diagrams:
+
+- [Microservices Architecture](./examples/microservices.edsl)
+- [State Machines](./examples/state-machine.edsl)
+- [Network Topology](./examples/network.edsl)
+- [System Architecture](./examples/system-architecture.edsl)
+- [Flow Charts](./examples/flowchart.edsl)
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/excalidraw-dsl
+cd excalidraw-dsl
+
+# Build the project
+cargo build
 
 # Run tests
 cargo test
 
-# Build without LLM features
-cargo build --no-default-features
+# Run with example
+cargo run -- examples/basic.edsl -o output.excalidraw
 ```
 
-### Contributing
+### Project Structure
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new features
-4. Ensure all tests pass
-5. Submit a pull request
+```
+excalidraw-dsl/
+├── src/
+│   ├── ast.rs          # Abstract syntax tree definitions
+│   ├── parser.rs       # Pest-based parser
+│   ├── igr.rs          # Intermediate graph representation
+│   ├── layout/         # Layout algorithms
+│   ├── generator.rs    # Excalidraw JSON generator
+│   └── main.rs         # CLI entry point
+├── grammar/
+│   └── edsl.pest       # Grammar definition
+├── examples/           # Example diagrams
+├── tests/             # Integration tests
+└── tutorial/          # Tutorial and documentation
+```
 
-## Roadmap
+## 🚦 Roadmap
 
-- [ ] More layout algorithms (ELK, custom layouts)
-- [ ] Web-based playground
-- [ ] VS Code extension
-- [ ] Additional shape types
-- [ ] Animation support
-- [ ] Export to other formats
+- [ ] **VSCode Extension** - Syntax highlighting and live preview
+- [ ] **More Layouts** - Hierarchical, circular, and custom layouts
+- [ ] **Theming** - Built-in color themes
+- [ ] **Export Formats** - SVG, PNG, PDF export
+- [ ] **Interactive Mode** - REPL for diagram creation
+- [ ] **Web Playground** - Online editor and compiler
+- [ ] **Diagram Libraries** - Reusable diagram components
+- [ ] **AI Integration** - Generate diagrams from descriptions
 
-## License
+## 📄 License
 
-This project is distributed under the terms of MIT.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-See [LICENSE](LICENSE.md) for details.
+## 🙏 Acknowledgments
 
-## Related Projects
+- [Excalidraw](https://excalidraw.com/) - For the amazing drawing tool
+- [Graphviz](https://graphviz.org/) - Inspiration for the DSL design
+- [Mermaid](https://mermaid-js.github.io/) - Ideas for diagram syntax
+- [Pest](https://pest.rs/) - Excellent parser generator
 
-- [Excalidraw](https://excalidraw.com/) - The amazing whiteboard tool
-- [Mermaid](https://mermaid-js.github.io/) - Inspiration for declarative syntax
-- [D2](https://d2lang.com/) - Modern diagram scripting language
+---
 
-## Acknowledgments
-
-This project is inspired by the excellent work of the Excalidraw team and the broader diagram-as-code community.
+Made with ❤️ by the Excalidraw DSL community
