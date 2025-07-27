@@ -1,19 +1,24 @@
 //! Example demonstrating enhanced ML layout capabilities (Phase 2)
 
 use excalidraw_dsl::{
-    excalidraw::ExcalidrawGenerator,
-    layout::{AdaptiveStrategy, DagreLayout, ForceLayout, LayoutEngineAdapter, LayoutManager},
+    generator::ExcalidrawGenerator,
+    igr::IntermediateGraph,
+    layout::{DagreLayout, ForceLayout},
     parser::parse_edsl,
     Result,
 };
 
 #[cfg(feature = "ml-layout")]
-use excalidraw_dsl::layout::ml::{EnhancedMLConfig, EnhancedMLLayoutBuilder};
+use excalidraw_dsl::layout::ml::EnhancedMLLayoutBuilder;
 
 use std::sync::Arc;
 
 #[cfg(feature = "ml-layout")]
 fn demonstrate_enhanced_ml_layout() -> Result<()> {
+    use excalidraw_dsl::layout::{
+        AdaptiveStrategy, LayoutContext, LayoutEngineAdapter, LayoutStrategy,
+    };
+
     println!("=== Enhanced ML Layout Demo (Phase 2) ===\n");
 
     // Example 1: GNN-based initial layout prediction
@@ -48,7 +53,7 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
     "#;
 
     let parsed = parse_edsl(edsl_gnn)?;
-    let mut igr = parsed.to_intermediate()?;
+    let mut igr = IntermediateGraph::from_ast(parsed)?;
 
     // Create enhanced ML layout with GNN enabled
     let fallback = Arc::new(LayoutEngineAdapter::new(DagreLayout::new()));
@@ -60,13 +65,13 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
         .with_fallback(fallback)
         .build()?;
 
-    let mut layout_manager = LayoutManager::new();
-    layout_manager.add_strategy(Arc::new(enhanced_layout));
-    layout_manager.apply("enhanced-ml", &mut igr)?;
+    // Apply the enhanced ML layout directly
+    let context = LayoutContext::default();
+    enhanced_layout.apply(&mut igr, &context)?;
 
-    let generator = ExcalidrawGenerator::new();
-    let excalidraw = generator.generate(&igr)?;
-    std::fs::write("ml_gnn_layout.json", excalidraw)?;
+    let excalidraw = ExcalidrawGenerator::generate_file(&igr)?;
+    let json = serde_json::to_string_pretty(&excalidraw)?;
+    std::fs::write("ml_gnn_layout.json", json)?;
     println!("✓ Generated: ml_gnn_layout.json (GNN-predicted layout)\n");
 
     // Example 2: RL-optimized layout
@@ -96,7 +101,7 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
     "#;
 
     let parsed = parse_edsl(edsl_rl)?;
-    let mut igr = parsed.to_intermediate()?;
+    let mut igr = IntermediateGraph::from_ast(parsed)?;
 
     // Create enhanced ML layout with RL optimization
     let fallback = Arc::new(LayoutEngineAdapter::new(ForceLayout::new()));
@@ -109,13 +114,13 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
         .with_fallback(fallback)
         .build()?;
 
-    let mut layout_manager = LayoutManager::new();
-    layout_manager.add_strategy(Arc::new(rl_layout));
-    layout_manager.apply("enhanced-ml", &mut igr)?;
+    // Apply the RL-optimized layout directly
+    let context = LayoutContext::default();
+    rl_layout.apply(&mut igr, &context)?;
 
-    let generator = ExcalidrawGenerator::new();
-    let excalidraw = generator.generate(&igr)?;
-    std::fs::write("ml_rl_optimized.json", excalidraw)?;
+    let excalidraw = ExcalidrawGenerator::generate_file(&igr)?;
+    let json = serde_json::to_string_pretty(&excalidraw)?;
+    std::fs::write("ml_rl_optimized.json", json)?;
     println!("✓ Generated: ml_rl_optimized.json (RL-optimized layout)\n");
 
     // Example 3: Constraint-satisfied layout
@@ -143,7 +148,7 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
     "#;
 
     let parsed = parse_edsl(edsl_constraints)?;
-    let mut igr = parsed.to_intermediate()?;
+    let mut igr = IntermediateGraph::from_ast(parsed)?;
 
     // Create enhanced ML layout focusing on constraints
     let fallback = Arc::new(LayoutEngineAdapter::new(DagreLayout::new()));
@@ -156,13 +161,13 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
         .with_fallback(fallback)
         .build()?;
 
-    let mut layout_manager = LayoutManager::new();
-    layout_manager.add_strategy(Arc::new(constraint_layout));
-    layout_manager.apply("enhanced-ml", &mut igr)?;
+    // Apply the constraint-satisfied layout directly
+    let context = LayoutContext::default();
+    constraint_layout.apply(&mut igr, &context)?;
 
-    let generator = ExcalidrawGenerator::new();
-    let excalidraw = generator.generate(&igr)?;
-    std::fs::write("ml_constraint_satisfied.json", excalidraw)?;
+    let excalidraw = ExcalidrawGenerator::generate_file(&igr)?;
+    let json = serde_json::to_string_pretty(&excalidraw)?;
+    std::fs::write("ml_constraint_satisfied.json", json)?;
     println!("✓ Generated: ml_constraint_satisfied.json (Constraint-satisfied layout)\n");
 
     // Example 4: Full enhanced ML pipeline
@@ -204,7 +209,7 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
     "#;
 
     let parsed = parse_edsl(edsl_full)?;
-    let mut igr = parsed.to_intermediate()?;
+    let mut igr = IntermediateGraph::from_ast(parsed)?;
 
     // Create full enhanced ML layout with all features
     let adaptive = Arc::new(
@@ -222,13 +227,13 @@ fn demonstrate_enhanced_ml_layout() -> Result<()> {
         .with_fallback(adaptive)
         .build()?;
 
-    let mut layout_manager = LayoutManager::new();
-    layout_manager.add_strategy(Arc::new(full_ml_layout));
-    layout_manager.apply("enhanced-ml", &mut igr)?;
+    // Apply the full ML pipeline layout directly
+    let context = LayoutContext::default();
+    full_ml_layout.apply(&mut igr, &context)?;
 
-    let generator = ExcalidrawGenerator::new();
-    let excalidraw = generator.generate(&igr)?;
-    std::fs::write("ml_full_pipeline.json", excalidraw)?;
+    let excalidraw = ExcalidrawGenerator::generate_file(&igr)?;
+    let json = serde_json::to_string_pretty(&excalidraw)?;
+    std::fs::write("ml_full_pipeline.json", json)?;
     println!("✓ Generated: ml_full_pipeline.json (Full ML pipeline layout)\n");
 
     println!("=== Enhanced ML Layout Demo Complete ===");
@@ -256,7 +261,7 @@ trait EnhancedMLLayoutBuilderExt {
 
 #[cfg(feature = "ml-layout")]
 impl EnhancedMLLayoutBuilderExt for EnhancedMLLayoutBuilder {
-    fn with_constraint_iterations(mut self, iterations: usize) -> Self {
+    fn with_constraint_iterations(self, _iterations: usize) -> Self {
         // This would be implemented in the actual builder
         self
     }

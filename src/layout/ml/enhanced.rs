@@ -387,12 +387,7 @@ impl EnhancedMLLayoutBuilder {
             ))
         })?;
 
-        let model_dir_clone = self.config.model_dir.clone();
-        if let Some(ref model_dir) = model_dir_clone {
-            EnhancedMLLayoutStrategy::from_model_dir(model_dir, self.config, fallback)
-        } else {
-            EnhancedMLLayoutStrategy::new(self.config, fallback)
-        }
+        EnhancedMLLayoutStrategy::new(self.config, fallback)
     }
 }
 
@@ -496,7 +491,6 @@ mod tests {
             .with_constraints(true)
             .with_feedback(true)
             .with_rl_episodes(100)
-            .with_model_dir("/tmp/models")
             .with_fallback(fallback)
             .build();
 
@@ -506,6 +500,5 @@ mod tests {
         assert!(strategy.config.use_gnn);
         assert!(strategy.config.use_rl);
         assert_eq!(strategy.config.rl_max_episodes, 100);
-        assert_eq!(strategy.config.model_dir, Some("/tmp/models".to_string()));
     }
 }

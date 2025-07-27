@@ -103,20 +103,21 @@ impl GATLayer {
 
             if neighbor_features.is_empty() {
                 // No neighbors, use self-attention only
-                let transformed = self.value_transform.forward(&node_feature).map_err(|e| {
+                let node_feature_2d = node_feature.unsqueeze(0).map_err(|e| {
                     EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
-                        "Failed to transform features: {e}"
+                        "Failed to unsqueeze node feature: {e}"
                     )))
                 })?;
+                let transformed = self
+                    .value_transform
+                    .forward(&node_feature_2d)
+                    .map_err(|e| {
+                        EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                            "Failed to transform features: {e}"
+                        )))
+                    })?;
                 output = output
-                    .slice_assign(
-                        &[node_idx..node_idx + 1, 0..self.output_dim],
-                        &transformed.unsqueeze(0).map_err(|e| {
-                            EDSLError::Layout(crate::error::LayoutError::CalculationFailed(
-                                format!("Failed to unsqueeze tensor: {e}"),
-                            ))
-                        })?,
-                    )
+                    .slice_assign(&[node_idx..node_idx + 1, 0..self.output_dim], &transformed)
                     .map_err(|e| {
                         EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
                             "Failed to assign output: {e}"
@@ -145,6 +146,12 @@ impl GATLayer {
                         .map_err(|e| {
                             EDSLError::Layout(crate::error::LayoutError::CalculationFailed(
                                 format!("Failed to compute attention score: {e}"),
+                            ))
+                        })?
+                        .squeeze(0)
+                        .map_err(|e| {
+                            EDSLError::Layout(crate::error::LayoutError::CalculationFailed(
+                                format!("Failed to squeeze attention score: {e}"),
                             ))
                         })?;
 
@@ -195,21 +202,19 @@ impl GATLayer {
                 }
 
                 // Transform aggregated features
-                let transformed = self.value_transform.forward(&aggregated).map_err(|e| {
+                let aggregated_2d = aggregated.unsqueeze(0).map_err(|e| {
+                    EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                        "Failed to unsqueeze aggregated features: {e}"
+                    )))
+                })?;
+                let transformed = self.value_transform.forward(&aggregated_2d).map_err(|e| {
                     EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
                         "Failed to transform aggregated features: {e}"
                     )))
                 })?;
 
                 output = output
-                    .slice_assign(
-                        &[node_idx..node_idx + 1, 0..self.output_dim],
-                        &transformed.unsqueeze(0).map_err(|e| {
-                            EDSLError::Layout(crate::error::LayoutError::CalculationFailed(
-                                format!("Failed to unsqueeze transformed: {e}"),
-                            ))
-                        })?,
-                    )
+                    .slice_assign(&[node_idx..node_idx + 1, 0..self.output_dim], &transformed)
                     .map_err(|e| {
                         EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
                             "Failed to assign output: {e}"
@@ -229,7 +234,7 @@ pub struct GNNLayoutPredictor {
     gat_layers: Vec<GATLayer>,
     position_head: candle_nn::Linear,
     confidence_head: candle_nn::Linear,
-    hidden_dim: usize,
+    _hidden_dim: usize,
 }
 
 impl GNNLayoutPredictor {
@@ -267,7 +272,7 @@ impl GNNLayoutPredictor {
             gat_layers,
             position_head,
             confidence_head,
-            hidden_dim,
+            _hidden_dim: hidden_dim,
         })
     }
 
@@ -315,7 +320,7 @@ impl GNNLayoutPredictor {
             gat_layers,
             position_head,
             confidence_head,
-            hidden_dim,
+            _hidden_dim: hidden_dim,
         })
     }
 
@@ -368,11 +373,19 @@ impl GNNLayoutPredictor {
             )))
         })?;
 
-        let confidence_vec: Vec<f32> = confidence_tensor.to_vec1().map_err(|e| {
-            EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
-                "Failed to extract confidence: {e}"
-            )))
-        })?;
+        let confidence_vec: Vec<f32> = confidence_tensor
+            .flatten_all()
+            .map_err(|e| {
+                EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                    "Failed to flatten confidence: {e}"
+                )))
+            })?
+            .to_vec1()
+            .map_err(|e| {
+                EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                    "Failed to extract confidence: {e}"
+                )))
+            })?;
 
         let mut positions = HashMap::new();
         for (i, node) in igr.graph.node_identifiers().enumerate() {
@@ -494,7 +507,7 @@ mod tests {
     #[test]
     fn test_gnn_predictor_creation() {
         let predictor = GNNLayoutPredictor::new(32, 64, 3).unwrap();
-        assert_eq!(predictor.hidden_dim, 64);
+        assert_eq!(predictor._hidden_dim, 64);
         assert_eq!(predictor.gat_layers.len(), 3);
     }
 

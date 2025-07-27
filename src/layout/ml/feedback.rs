@@ -236,7 +236,7 @@ impl FeedbackCollector {
         }
 
         // Calculate slope of trend line
-        
+
         (n * xy_sum - x_sum * y_sum) / (n * x2_sum - x_sum * x_sum)
     }
 }
@@ -277,7 +277,7 @@ impl DataAnonymizer {
 
 /// Anonymized session data for training
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct AnonymizedSession {
+pub struct AnonymizedSession {
     timestamp: DateTime<Utc>,
     graph_features: GraphFeatures,
     selected_strategy: String,
@@ -289,8 +289,8 @@ struct AnonymizedSession {
 
 /// Online model updater that learns from feedback
 pub struct OnlineModelUpdater {
-    learning_rate: f64,
-    batch_size: usize,
+    _learning_rate: f64,
+    _batch_size: usize,
     update_threshold: usize,
     pending_updates: Arc<Mutex<Vec<AnonymizedSession>>>,
 }
@@ -298,8 +298,8 @@ pub struct OnlineModelUpdater {
 impl OnlineModelUpdater {
     pub fn new(learning_rate: f64, batch_size: usize) -> Self {
         Self {
-            learning_rate,
-            batch_size,
+            _learning_rate: learning_rate,
+            _batch_size: batch_size,
             update_threshold: batch_size * 2,
             pending_updates: Arc::new(Mutex::new(Vec::new())),
         }

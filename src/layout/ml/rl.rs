@@ -269,8 +269,10 @@ impl LayoutEnvironment {
     }
 
     fn is_converged(&self) -> bool {
-        // Simple convergence check
-        self.current_state.edge_crossings == 0 && self.current_state.node_overlaps == 0
+        // Don't converge too early - require multiple steps
+        self.step_count >= 5
+            && self.current_state.edge_crossings == 0
+            && self.current_state.node_overlaps == 0
     }
 }
 
@@ -426,6 +428,7 @@ impl QualityEvaluator {
 
 /// PPO Policy network for RL optimization
 pub struct LayoutPolicy {
+    #[allow(dead_code)]
     var_map: VarMap,
     device: Device,
     actor_net: Box<dyn Fn(&Tensor) -> candle_core::Result<Tensor> + Send + Sync>,
@@ -535,7 +538,21 @@ impl LayoutPolicy {
             )))
         })?;
 
-        let value_scalar = value.to_scalar::<f32>().map_err(|e| {
+        let value_squeezed = value
+            .squeeze(0)
+            .map_err(|e| {
+                EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                    "Failed to squeeze value tensor: {e}"
+                )))
+            })?
+            .squeeze(0)
+            .map_err(|e| {
+                EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
+                    "Failed to squeeze value tensor again: {e}"
+                )))
+            })?;
+
+        let value_scalar = value_squeezed.to_scalar::<f32>().map_err(|e| {
             EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
                 "Failed to extract value scalar: {e}"
             )))
@@ -547,6 +564,7 @@ impl LayoutPolicy {
         ))
     }
 
+    #[allow(dead_code)]
     pub fn save(&self, path: &Path) -> Result<()> {
         self.var_map.save(path).map_err(|e| {
             EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
@@ -555,6 +573,7 @@ impl LayoutPolicy {
         })
     }
 
+    #[allow(dead_code)]
     pub fn load(path: &Path) -> Result<Self> {
         let _device = Device::Cpu;
         let mut var_map = VarMap::new();
@@ -573,7 +592,9 @@ impl LayoutPolicy {
 /// RL-based layout optimizer
 pub struct RLLayoutOptimizer {
     policy: LayoutPolicy,
+    #[allow(dead_code)]
     learning_rate: f64,
+    #[allow(dead_code)]
     discount_factor: f64,
 }
 
@@ -739,7 +760,7 @@ mod tests {
             dy: 10.0,
         };
 
-        let (new_state, reward, done) = env.step(action).unwrap();
+        let (new_state, _reward, done) = env.step(action).unwrap();
         assert!(!done);
         assert_eq!(new_state.positions.len(), 2);
     }
