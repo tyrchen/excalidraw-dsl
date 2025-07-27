@@ -255,6 +255,7 @@ impl ExcalidrawGenerator {
         let mut elements = Vec::new();
         let mut node_id_map = std::collections::HashMap::new();
         let mut node_element_indices = std::collections::HashMap::new();
+        let mut element_indices = std::collections::HashMap::new(); // Track all element indices
 
         // Generate group elements first (visual grouping rectangles) in depth-first order
         let group_order = Self::get_group_render_order(&igr.groups);
@@ -301,7 +302,16 @@ impl ExcalidrawGenerator {
         for &container_idx in &container_order {
             let container = &igr.containers[container_idx];
             if let Some(mut container_element) = Self::generate_container(container)? {
-                let container_id = container_element.id.clone();
+                let container_element_id = container_element.id.clone();
+
+                // Map container ID to element ID for edge connections
+                if let Some(ref container_id) = container.id {
+                    node_id_map.insert(container_id.clone(), container_element_id.clone());
+                }
+
+                // Track the container element index before adding to elements
+                let container_index = elements.len();
+                element_indices.insert(container_element_id.clone(), container_index);
 
                 // Generate text element for container if it has a label
                 if let Some(label) = &container.label {
@@ -311,7 +321,7 @@ impl ExcalidrawGenerator {
                                 label,
                                 bounds.x + 10.0, // 10px padding from left edge
                                 bounds.y + 10.0, // 10px padding from top edge
-                                &container_id,
+                                &container_element_id,
                                 container.attributes.font_size.unwrap_or(16.0),
                                 &container.attributes.font,
                             )?;
@@ -336,8 +346,12 @@ impl ExcalidrawGenerator {
             }
         }
 
-        // Generate node elements
+        // Generate node elements (skip virtual container nodes)
         for (_, node_data) in igr.graph.node_references() {
+            // Skip virtual container nodes - they're only for routing connections
+            if node_data.is_virtual_container {
+                continue;
+            }
             let element_id = format!("node_{}", Uuid::new_v4());
             let mut element = Self::generate_node(node_data, &element_id)?;
             node_id_map.insert(node_data.id.clone(), element_id.clone());
@@ -348,6 +362,7 @@ impl ExcalidrawGenerator {
             // Track the actual index where this node element is pushed
             let node_index = elements.len();
             node_element_indices.insert(element_id.clone(), node_index);
+            element_indices.insert(element_id.clone(), node_index);
 
             // Generate separate text element for node label
             if let Some(label) = label {
@@ -406,8 +421,8 @@ impl ExcalidrawGenerator {
 
             let edge_id = edge_element.id.clone();
 
-            // Update source node's boundElements to include this edge
-            if let Some(&source_index) = node_element_indices.get(source_element_id) {
+            // Update source element's boundElements to include this edge (works for both nodes and containers)
+            if let Some(&source_index) = element_indices.get(source_element_id) {
                 elements[source_index]
                     .bound_elements
                     .push(serde_json::json!({
@@ -416,8 +431,8 @@ impl ExcalidrawGenerator {
                     }));
             }
 
-            // Update target node's boundElements to include this edge
-            if let Some(&target_index) = node_element_indices.get(target_element_id) {
+            // Update target element's boundElements to include this edge (works for both nodes and containers)
+            if let Some(&target_index) = element_indices.get(target_element_id) {
                 elements[target_index]
                     .bound_elements
                     .push(serde_json::json!({
@@ -1042,6 +1057,7 @@ mod tests {
             y: 100.0,
             width: 120.0,
             height: 60.0,
+            is_virtual_container: false,
         };
 
         let result = ExcalidrawGenerator::generate_node(&node_data, "test_id").unwrap();

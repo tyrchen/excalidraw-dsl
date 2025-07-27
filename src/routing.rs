@@ -465,6 +465,7 @@ mod tests {
             y,
             width,
             height,
+            is_virtual_container: false,
         }
     }
 

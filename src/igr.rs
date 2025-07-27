@@ -11,6 +11,7 @@ pub struct IntermediateGraph {
     pub containers: Vec<ContainerData>,
     pub groups: Vec<GroupData>,
     pub node_map: HashMap<String, NodeIndex>,
+    pub container_map: HashMap<String, usize>, // Maps container IDs to container indices
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub struct NodeData {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    pub is_virtual_container: bool, // Flag to identify virtual container nodes
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +112,7 @@ impl IntermediateGraph {
             containers: Vec::new(),
             groups: Vec::new(),
             node_map: HashMap::new(),
+            container_map: HashMap::new(),
         }
     }
 
@@ -145,7 +148,13 @@ impl IntermediateGraph {
             igr.node_map.insert(node_data.id.clone(), node_idx);
         }
 
-        // Build edges
+        // Build container hierarchy first to populate container_map
+        igr.build_container_hierarchy(document.containers, None)?;
+
+        // Create virtual nodes for containers so they can be referenced in edges
+        igr.create_container_virtual_nodes()?;
+
+        // Build edges (now container IDs are available in node_map)
         for edge_def in all_edges {
             let from_idx = igr
                 .node_map
@@ -159,9 +168,6 @@ impl IntermediateGraph {
             let edge_data = EdgeData::from_definition(edge_def)?;
             igr.graph.add_edge(*from_idx, *to_idx, edge_data);
         }
-
-        // Build container hierarchy
-        igr.build_container_hierarchy(document.containers, None)?;
 
         // Build group hierarchy
         igr.build_group_hierarchy(document.groups, None, None)?;
@@ -202,6 +208,13 @@ impl IntermediateGraph {
             container_data.parent_container = parent_container_idx;
 
             let container_idx = self.containers.len();
+
+            // Add container ID to container_map if it exists
+            if let Some(ref container_id) = container_data.id {
+                self.container_map
+                    .insert(container_id.clone(), container_idx);
+            }
+
             self.containers.push(container_data);
 
             // Process nested structures
@@ -235,6 +248,35 @@ impl IntermediateGraph {
                 container.nested_containers =
                     (nested_container_start_idx..nested_container_end_idx).collect();
                 container.nested_groups = (nested_group_start_idx..nested_group_end_idx).collect();
+            }
+        }
+        Ok(())
+    }
+
+    /// Create virtual nodes for containers so they can be referenced in connections
+    fn create_container_virtual_nodes(&mut self) -> Result<()> {
+        for container in self.containers.iter() {
+            if let Some(ref container_id) = container.id {
+                // Check if this container ID is already in node_map (shouldn't be)
+                if !self.node_map.contains_key(container_id) {
+                    // Create a virtual node for the container
+                    let virtual_node = NodeData {
+                        id: container_id.clone(),
+                        label: container
+                            .label
+                            .clone()
+                            .unwrap_or_else(|| container_id.clone()),
+                        attributes: container.attributes.clone(),
+                        x: 0.0,                     // Will be set by layout
+                        y: 0.0,                     // Will be set by layout
+                        width: 100.0,               // Default width
+                        height: 50.0,               // Default height
+                        is_virtual_container: true, // Mark as virtual
+                    };
+
+                    let node_idx = self.graph.add_node(virtual_node);
+                    self.node_map.insert(container_id.clone(), node_idx);
+                }
             }
         }
         Ok(())
@@ -484,6 +526,7 @@ impl NodeData {
             y: 0.0,
             width: estimated_width,
             height: estimated_height,
+            is_virtual_container: false, // Regular nodes are not virtual containers
         })
     }
 }

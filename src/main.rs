@@ -101,6 +101,7 @@ enum Commands {
 enum LayoutAlgorithm {
     Dagre,
     Force,
+    Elk,
 }
 
 impl std::fmt::Display for LayoutAlgorithm {
@@ -108,6 +109,7 @@ impl std::fmt::Display for LayoutAlgorithm {
         match self {
             LayoutAlgorithm::Dagre => write!(f, "dagre"),
             LayoutAlgorithm::Force => write!(f, "force"),
+            LayoutAlgorithm::Elk => write!(f, "elk"),
         }
     }
 }

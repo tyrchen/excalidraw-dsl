@@ -346,8 +346,8 @@ impl ElkLayout {
         offset_x: f64,
         offset_y: f64,
     ) -> Result<()> {
-        let layer_spacing = 180.0; // Increased layer spacing
-        let base_node_spacing = self.options.spacing_node_node.max(30.0); // Minimum 30px spacing
+        let layer_spacing = 250.0; // Further increased layer spacing
+        let base_node_spacing = self.options.spacing_node_node.max(50.0); // Minimum 50px spacing
 
         // Position layers
         for (layer_idx, layer) in layers.iter().enumerate() {
@@ -691,8 +691,8 @@ impl ElkLayout {
 
             // Only set bounds if we found any content
             if min_x != f64::INFINITY {
-                // Add padding
-                let padding = 30.0;
+                // Add padding - increased for better separation
+                let padding = 50.0;
                 containers[idx].bounds = Some(BoundingBox {
                     x: min_x - padding,
                     y: min_y - padding,
@@ -713,6 +713,23 @@ impl ElkLayout {
                     &igr.graph,
                     &mut processed,
                 );
+            }
+        }
+
+        // Update virtual container nodes with the calculated bounds
+        for container in &igr.containers {
+            if let (Some(ref container_id), Some(ref bounds)) = (&container.id, &container.bounds) {
+                // Find the virtual node for this container
+                if let Some(&node_idx) = igr.node_map.get(container_id) {
+                    let node = &mut igr.graph[node_idx];
+                    if node.is_virtual_container {
+                        // Update virtual node position to center of container bounds
+                        node.x = bounds.x + bounds.width / 2.0;
+                        node.y = bounds.y + bounds.height / 2.0;
+                        node.width = bounds.width;
+                        node.height = bounds.height;
+                    }
+                }
             }
         }
     }
@@ -742,9 +759,9 @@ impl ElkLayout {
             }
 
             let padding = match &group.group_type {
-                GroupType::FlowGroup => 35.0,
-                GroupType::BasicGroup => 30.0,
-                GroupType::SemanticGroup(_) => 40.0,
+                GroupType::FlowGroup => 50.0,
+                GroupType::BasicGroup => 45.0,
+                GroupType::SemanticGroup(_) => 55.0,
             };
 
             group.bounds = Some(BoundingBox {
@@ -857,8 +874,8 @@ impl ElkLayout {
 
         // Second pass: Arrange containers in a grid with improved spacing
         let cols = ((container_count as f64).sqrt().ceil() as usize).max(1);
-        let container_spacing = 80.0; // Increased spacing
-        let global_padding = 60.0; // Increased global padding
+        let container_spacing = 150.0; // Significantly increased spacing to prevent overlaps
+        let global_padding = 100.0; // Increased global padding
 
         // Pre-calculate row heights for better grid arrangement
         let rows = container_count.div_ceil(cols);
