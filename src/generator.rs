@@ -275,6 +275,7 @@ impl ExcalidrawGenerator {
                                 &group_id,
                                 group.attributes.font_size.unwrap_or(16.0),
                                 &group.attributes.font,
+                                &group.attributes.text_color,
                             )?;
 
                             // Add reference to text element in the group's boundElements
@@ -324,6 +325,7 @@ impl ExcalidrawGenerator {
                                 &container_element_id,
                                 container.attributes.font_size.unwrap_or(16.0),
                                 &container.attributes.font,
+                                &container.attributes.text_color,
                             )?;
 
                             // Add reference to text element in the container's boundElements
@@ -374,6 +376,7 @@ impl ExcalidrawGenerator {
                         &element_id,
                         node_data.attributes.font_size.unwrap_or(20.0),
                         &node_data.attributes.font,
+                        &node_data.attributes.text_color,
                     )?;
 
                     // Add reference to text element in the shape's boundElements
@@ -878,6 +881,7 @@ impl ExcalidrawGenerator {
         container_id: &str,
         font_size: f64,
         font: &Option<String>,
+        text_color: &Option<String>,
     ) -> Result<ExcalidrawElementSkeleton> {
         let font_family = Self::convert_font_family(font);
         let (text_width, text_height) =
@@ -895,7 +899,9 @@ impl ExcalidrawGenerator {
             width: text_width,
             height: text_height,
             angle: 0,
-            stroke_color: DEFAULT_STROKE_COLOR.to_string(),
+            stroke_color: text_color
+                .clone()
+                .unwrap_or_else(|| DEFAULT_STROKE_COLOR.to_string()),
             background_color: "transparent".to_string(),
             fill_style: DEFAULT_FILL_STYLE.to_string(),
             stroke_width: 0,
@@ -938,6 +944,7 @@ impl ExcalidrawGenerator {
         container_id: &str,
         font_size: f64,
         font: &Option<String>,
+        text_color: &Option<String>,
     ) -> Result<ExcalidrawElementSkeleton> {
         let font_family = Self::convert_font_family(font);
         let (text_width, text_height) =
@@ -955,7 +962,9 @@ impl ExcalidrawGenerator {
             width: text_width,
             height: text_height,
             angle: 0,
-            stroke_color: DEFAULT_STROKE_COLOR.to_string(),
+            stroke_color: text_color
+                .clone()
+                .unwrap_or_else(|| DEFAULT_STROKE_COLOR.to_string()),
             background_color: "transparent".to_string(),
             fill_style: DEFAULT_FILL_STYLE.to_string(),
             stroke_width: 0,

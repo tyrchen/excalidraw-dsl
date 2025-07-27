@@ -83,6 +83,7 @@ pub struct ExcalidrawAttributes {
     pub font: Option<String>,
     pub font_size: Option<f64>,
     pub rounded: Option<f64>,
+    pub text_color: Option<String>, // Text color for labels
 
     // Arrow properties
     pub start_arrowhead: Option<ArrowheadType>,
@@ -799,6 +800,11 @@ impl ExcalidrawAttributes {
                 "rounded" => {
                     if let Some(n) = value.as_number() {
                         excalidraw_attrs.rounded = Some(n);
+                    }
+                }
+                "color" => {
+                    if let Some(s) = value.as_string() {
+                        excalidraw_attrs.text_color = Some(s.to_string());
                     }
                 }
                 _ => {
