@@ -146,11 +146,13 @@ impl EnhancedTrainer {
         // Generate synthetic integration training data
         let mut samples = Vec::new();
 
-        let test_graphs = ["diagram integration1 { a -> b -> c -> d; }",
-            "diagram integration2 { root -> left, right; left -> l1, l2; right -> r1, r2; }",
-            "diagram integration3 { center -> n1, n2, n3, n4; }",
-            "diagram integration4 { hub1 -> s1, s2; hub2 -> s3, s4; hub1 -> hub2; }",
-            "diagram integration5 { ceo -> vp1, vp2; vp1 -> mgr1, mgr2; vp2 -> mgr3; mgr1 -> emp1, emp2; }"];
+        let test_graphs = [
+            "a [Node A]; b [Node B]; c [Node C]; d [Node D]; a -> b -> c -> d;",
+            "root [Root]; left [Left]; right [Right]; l1 [L1]; l2 [L2]; r1 [R1]; r2 [R2]; root -> left; root -> right; left -> l1; left -> l2; right -> r1; right -> r2;",
+            "center [Center]; n1 [Node 1]; n2 [Node 2]; n3 [Node 3]; n4 [Node 4]; center -> n1; center -> n2; center -> n3; center -> n4;",
+            "hub1 [Hub 1]; hub2 [Hub 2]; s1 [S1]; s2 [S2]; s3 [S3]; s4 [S4]; hub1 -> s1; hub1 -> s2; hub2 -> s3; hub2 -> s4; hub1 -> hub2;",
+            "ceo [CEO]; vp1 [VP1]; vp2 [VP2]; mgr1 [Mgr1]; mgr2 [Mgr2]; mgr3 [Mgr3]; emp1 [Emp1]; emp2 [Emp2]; ceo -> vp1; ceo -> vp2; vp1 -> mgr1; vp1 -> mgr2; vp2 -> mgr3; mgr1 -> emp1; mgr1 -> emp2;"
+        ];
 
         for (i, graph_edsl) in test_graphs.iter().enumerate() {
             let parsed = crate::parser::parse_edsl(graph_edsl)?;

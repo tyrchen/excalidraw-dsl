@@ -159,7 +159,7 @@ impl GNNTrainer {
         // Generate synthetic training samples
         for i in 0..1000 {
             let sample = TrainingSample {
-                graph_edsl: format!("diagram test_{i} {{ a -> b -> c; }}"),
+                graph_edsl: "a [Node A]; b [Node B]; c [Node C]; a -> b -> c;".to_string(),
                 graph_features: (0..32).map(|j| (i * j) as f32 / 1000.0).collect(),
                 target_positions: {
                     let mut positions = std::collections::HashMap::new();

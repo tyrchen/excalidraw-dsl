@@ -91,12 +91,17 @@ impl MLStrategySelector {
         // Get strategy predictions
         let strategy_probs = self.strategy_model.predict(&feature_vector)?;
 
-        // Find the best strategy
+        // Find the best strategy, handling NaN values
         let (best_idx, &confidence) = strategy_probs
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .filter(|(_, &val)| val.is_finite())
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .ok_or_else(|| {
+                crate::error::EDSLError::Layout(crate::error::LayoutError::CalculationFailed(
+                    "All strategy predictions are invalid (NaN or Inf)".to_string(),
+                ))
+            })?;
 
         // Get performance predictions
         let performance_preds = self.performance_model.predict(&feature_vector)?;
@@ -197,8 +202,12 @@ impl MLStrategySelector {
             })
             .collect();
 
-        // Sort by confidence (descending)
-        predictions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+        // Sort by confidence (descending), handling NaN values
+        predictions.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(predictions)
     }

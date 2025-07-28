@@ -145,8 +145,19 @@ impl LayoutPredictionModel {
             )))
         })?;
 
-        // Convert back to f64
-        let output_vec: Vec<f64> = output_vec_f32.iter().map(|&x| x as f64).collect();
+        // Convert back to f64 and validate
+        let output_vec: Vec<f64> = output_vec_f32
+            .iter()
+            .map(|&x| {
+                let val = x as f64;
+                // Replace NaN/Inf with a default value
+                if val.is_finite() {
+                    val
+                } else {
+                    0.5 // Default to neutral probability
+                }
+            })
+            .collect();
 
         Ok(output_vec)
     }

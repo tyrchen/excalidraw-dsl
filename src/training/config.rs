@@ -250,11 +250,10 @@ impl Default for EvaluationConfig {
     fn default() -> Self {
         Self {
             test_graphs: vec![
-                "diagram simple { a -> b -> c; }".to_string(),
-                "diagram tree { root -> left, right; left -> l1, l2; right -> r1, r2; }"
-                    .to_string(),
-                "diagram star { center -> n1, n2, n3, n4; }".to_string(),
-                "diagram mesh { n1 -> n2, n3; n2 -> n3, n4; n3 -> n4, n1; }".to_string(),
+                "a [Node A]; b [Node B]; c [Node C]; a -> b -> c;".to_string(),
+                "root [Root]; left [Left]; right [Right]; l1 [L1]; l2 [L2]; r1 [R1]; r2 [R2]; root -> left; root -> right; left -> l1; left -> l2; right -> r1; right -> r2;".to_string(),
+                "center [Center]; n1 [Node 1]; n2 [Node 2]; n3 [Node 3]; n4 [Node 4]; center -> n1; center -> n2; center -> n3; center -> n4;".to_string(),
+                "n1 [Node 1]; n2 [Node 2]; n3 [Node 3]; n4 [Node 4]; n1 -> n2; n1 -> n3; n2 -> n3; n2 -> n4; n3 -> n4; n3 -> n1;".to_string(),
             ],
             metrics: vec![
                 EvaluationMetric::EdgeCrossings,

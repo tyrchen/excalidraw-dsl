@@ -167,10 +167,10 @@ impl ConstraintTrainer {
     fn generate_constraint_case(&self, seed: usize) -> Result<ConstraintTrainingCase> {
         // Generate a simple graph
         let graph_edsl = match seed % 4 {
-            0 => "diagram constraint_test { a -> b -> c; }",
-            1 => "diagram constraint_test { root -> left, right; }",
-            2 => "diagram constraint_test { center -> n1, n2, n3; }",
-            _ => "diagram constraint_test { n1 -> n2, n3; n2 -> n3; }",
+            0 => "a [Node A]; b [Node B]; c [Node C]; a -> b -> c;",
+            1 => "root [Root]; left [Left]; right [Right]; root -> left; root -> right;",
+            2 => "center [Center]; n1 [Node 1]; n2 [Node 2]; n3 [Node 3]; center -> n1; center -> n2; center -> n3;",
+            _ => "n1 [Node 1]; n2 [Node 2]; n3 [Node 3]; n1 -> n2; n1 -> n3; n2 -> n3;",
         };
 
         let parsed = crate::parser::parse_edsl(graph_edsl)?;

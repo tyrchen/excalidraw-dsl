@@ -129,7 +129,7 @@ impl TrainingDataGenerator {
     }
 
     fn generate_graph(&self, graph_type: &GraphType, size: usize, seed: usize) -> Result<String> {
-        let graph_name = format!("{graph_type:?}_{size}_{seed}");
+        let graph_name = format!("test_{}_{}", format!("{graph_type:?}").to_lowercase(), seed);
 
         match graph_type {
             GraphType::Chain => self.generate_chain_graph(&graph_name, size),
@@ -144,16 +144,16 @@ impl TrainingDataGenerator {
     fn generate_chain_graph(&self, _name: &str, size: usize) -> Result<String> {
         let mut edsl = String::new();
 
-        // Create nodes
+        // Create nodes with proper attributes
         for i in 0..size {
-            edsl.push_str(&format!("n{i} [Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [Node {i}];\n"));
         }
 
         edsl.push('\n');
 
         // Create chain connections
         for i in 0..size.saturating_sub(1) {
-            edsl.push_str(&format!("n{} -> n{}\n", i, i + 1));
+            edsl.push_str(&format!("n{} -> n{};\n", i, i + 1));
         }
 
         Ok(edsl)
@@ -162,9 +162,9 @@ impl TrainingDataGenerator {
     fn generate_tree_graph(&self, _name: &str, size: usize) -> Result<String> {
         let mut edsl = String::new();
 
-        // Create nodes
+        // Create nodes with proper attributes
         for i in 0..size {
-            edsl.push_str(&format!("n{i} [Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [Node {i}];\n"));
         }
 
         edsl.push('\n');
@@ -172,7 +172,7 @@ impl TrainingDataGenerator {
         // Create tree structure (binary tree)
         for i in 1..size {
             let parent = (i - 1) / 2;
-            edsl.push_str(&format!("n{parent} -> n{i}\n"));
+            edsl.push_str(&format!("n{parent} -> n{i};\n"));
         }
 
         Ok(edsl)
@@ -181,16 +181,16 @@ impl TrainingDataGenerator {
     fn generate_star_graph(&self, _name: &str, size: usize) -> Result<String> {
         let mut edsl = String::new();
 
-        // Create nodes
+        // Create nodes with proper attributes
         for i in 0..size {
-            edsl.push_str(&format!("n{i} [Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [Node {i}];\n"));
         }
 
         edsl.push('\n');
 
         // Create star connections (node 0 is center)
         for i in 1..size {
-            edsl.push_str(&format!("n0 -> n{i}\n"));
+            edsl.push_str(&format!("n0 -> n{i};\n"));
         }
 
         Ok(edsl)
@@ -199,9 +199,9 @@ impl TrainingDataGenerator {
     fn generate_mesh_graph(&self, _name: &str, size: usize) -> Result<String> {
         let mut edsl = String::new();
 
-        // Create nodes
+        // Create nodes with proper attributes
         for i in 0..size {
-            edsl.push_str(&format!("n{i} [Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [Node {i}];\n"));
         }
 
         edsl.push('\n');
@@ -210,11 +210,11 @@ impl TrainingDataGenerator {
         for i in 0..size {
             // Connect to next node
             if i + 1 < size {
-                edsl.push_str(&format!("n{} -> n{}\n", i, i + 1));
+                edsl.push_str(&format!("n{} -> n{};\n", i, i + 1));
             }
             // Connect to one additional node to create mesh structure
             if i + 2 < size {
-                edsl.push_str(&format!("n{} -> n{}\n", i, i + 2));
+                edsl.push_str(&format!("n{} -> n{};\n", i, i + 2));
             }
         }
 
@@ -230,7 +230,7 @@ impl TrainingDataGenerator {
 
         for i in 0..size {
             let level = i / nodes_per_level;
-            edsl.push_str(&format!("n{i} [L{level} Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [L{level} Node {i}];\n"));
         }
 
         edsl.push('\n');
@@ -243,7 +243,7 @@ impl TrainingDataGenerator {
             for i in current_start..current_start + nodes_per_level {
                 for j in next_start..next_start + nodes_per_level {
                     if j < size {
-                        edsl.push_str(&format!("n{i} -> n{j}\n"));
+                        edsl.push_str(&format!("n{i} -> n{j};\n"));
                     }
                 }
             }
@@ -255,9 +255,9 @@ impl TrainingDataGenerator {
     fn generate_random_graph(&self, _name: &str, size: usize, seed: usize) -> Result<String> {
         let mut edsl = String::new();
 
-        // Create nodes
+        // Create nodes with proper attributes
         for i in 0..size {
-            edsl.push_str(&format!("n{i} [Node {i}]\n"));
+            edsl.push_str(&format!("n{i} [Node {i}];\n"));
         }
 
         edsl.push('\n');
@@ -269,7 +269,7 @@ impl TrainingDataGenerator {
                 // Simple pseudo-random number generator
                 let hash = ((i * 31 + j * 17 + seed * 13) % 100) as f64 / 100.0;
                 if hash < edge_probability {
-                    edsl.push_str(&format!("n{i} -> n{j}\n"));
+                    edsl.push_str(&format!("n{i} -> n{j};\n"));
                 }
             }
         }
