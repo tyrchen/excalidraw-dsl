@@ -1,99 +1,118 @@
 # Microservices Architecture with ML Layout
 # This example demonstrates how ML layout can optimize complex microservice architectures
+---
+layout: ml
+theme: light
+node_spacing: 120
+edge_spacing: 80
+---
 
-diagram microservices_architecture {
-    # API Gateway and Load Balancers
-    user [label="User"];
-    lb [label="Load Balancer"];
-    api_gateway [label="API Gateway"];
+# API Gateway and Load Balancers
+user [User];
+lb [Load Balancer];
+api_gateway [API Gateway];
 
-    # Authentication & Authorization
-    auth_service [label="Auth Service"];
-    user_service [label="User Service"];
-    session_store [label="Session Store"];
+# Authentication & Authorization
+auth_service [Auth Service];
+user_service [User Service];
+session_store [Session Store];
 
-    # Core Business Services
-    order_service [label="Order Service"];
-    payment_service [label="Payment Service"];
-    inventory_service [label="Inventory Service"];
-    shipping_service [label="Shipping Service"];
-    notification_service [label="Notification Service"];
+# Core Business Services
+order_service [Order Service];
+payment_service [Payment Service];
+inventory_service [Inventory Service];
+shipping_service [Shipping Service];
+notification_service [Notification Service];
 
-    # Data Processing Services
-    analytics_service [label="Analytics Service"];
-    recommendation_service [label="Recommendation Service"];
-    search_service [label="Search Service"];
+# Data Processing Services
+analytics_service [Analytics Service];
+recommendation_service [Recommendation Service];
+search_service [Search Service];
 
-    # Databases
-    user_db [label="User Database"];
-    order_db [label="Order Database"];
-    payment_db [label="Payment Database"];
-    inventory_db [label="Inventory Database"];
-    analytics_db [label="Analytics Database"];
+# Databases
+user_db [User Database];
+order_db [Order Database];
+payment_db [Payment Database];
+inventory_db [Inventory Database];
+analytics_db [Analytics Database];
 
-    # Message Queue and Cache
-    message_queue [label="Message Queue"];
-    redis_cache [label="Redis Cache"];
+# Message Queue and Cache
+message_queue [Message Queue];
+redis_cache [Redis Cache];
 
-    # External Services
-    payment_gateway [label="Payment Gateway"];
-    shipping_api [label="Shipping API"];
-    email_service [label="Email Service"];
+# External Services
+payment_gateway [Payment Gateway];
+shipping_api [Shipping API];
+email_service [Email Service];
 
-    # Infrastructure
-    monitoring [label="Monitoring"];
-    logging [label="Logging"];
-    config_service [label="Config Service"];
+# Infrastructure
+monitoring [Monitoring];
+logging [Logging];
+config_service [Config Service];
 
-    # User flow
-    user -> lb -> api_gateway;
+# User flow
+user -> lb -> api_gateway;
 
-    # Authentication flow
-    api_gateway -> auth_service;
-    auth_service -> user_service;
-    auth_service -> session_store;
-    user_service -> user_db;
+# Authentication flow
+api_gateway -> auth_service;
+auth_service -> user_service;
+auth_service -> session_store;
+user_service -> user_db;
 
-    # Business logic flows
-    api_gateway -> order_service, payment_service, inventory_service, search_service;
+# Business logic flows
+api_gateway -> order_service;
+api_gateway -> payment_service;
+api_gateway -> inventory_service;
+api_gateway -> search_service;
 
-    # Order processing flow
-    order_service -> order_db;
-    order_service -> payment_service;
-    order_service -> inventory_service;
-    order_service -> shipping_service;
-    order_service -> notification_service;
+# Order processing flow
+order_service -> order_db;
+order_service -> payment_service;
+order_service -> inventory_service;
+order_service -> shipping_service;
+order_service -> notification_service;
 
-    # Payment processing
-    payment_service -> payment_db;
-    payment_service -> payment_gateway;
+# Payment processing
+payment_service -> payment_db;
+payment_service -> payment_gateway;
 
-    # Inventory management
-    inventory_service -> inventory_db;
+# Inventory management
+inventory_service -> inventory_db;
 
-    # Shipping integration
-    shipping_service -> shipping_api;
+# Shipping integration
+shipping_service -> shipping_api;
 
-    # Notification system
-    notification_service -> email_service;
-    notification_service -> message_queue;
+# Notification system
+notification_service -> email_service;
+notification_service -> message_queue;
 
-    # Analytics and recommendations
-    analytics_service -> analytics_db;
-    analytics_service <- order_service, payment_service, inventory_service;
-    recommendation_service -> analytics_service;
-    recommendation_service -> redis_cache;
+# Analytics and recommendations
+analytics_service -> analytics_db;
+order_service -> analytics_service;
+payment_service -> analytics_service;
+inventory_service -> analytics_service;
+recommendation_service -> analytics_service;
+recommendation_service -> redis_cache;
 
-    # Search functionality
-    search_service -> redis_cache;
-    search_service -> inventory_service;
+# Search functionality
+search_service -> redis_cache;
+search_service -> inventory_service;
 
-    # Cross-cutting concerns
-    monitoring <- order_service, payment_service, inventory_service, auth_service;
-    logging <- api_gateway, order_service, payment_service, inventory_service;
-    config_service -> auth_service, order_service, payment_service, inventory_service;
+# Cross-cutting concerns
+order_service -> monitoring;
+payment_service -> monitoring;
+inventory_service -> monitoring;
+auth_service -> monitoring;
+api_gateway -> logging;
+order_service -> logging;
+payment_service -> logging;
+inventory_service -> logging;
+config_service -> auth_service;
+config_service -> order_service;
+config_service -> payment_service;
+config_service -> inventory_service;
 
-    # Message queue integrations
-    message_queue <- order_service, payment_service;
-    message_queue -> notification_service, analytics_service;
-}
+# Message queue integrations
+order_service -> message_queue;
+payment_service -> message_queue;
+message_queue -> analytics_service;

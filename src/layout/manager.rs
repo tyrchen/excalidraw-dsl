@@ -41,16 +41,16 @@ impl LayoutManager {
         // Register ML layout if feature is enabled
         #[cfg(feature = "ml-layout")]
         {
-            // Create an adaptive strategy as fallback for ML
-            let adaptive_fallback = Arc::new(
+            // Create a cycle-aware fallback strategy for ML (prefer Force layout for cycles)
+            let cycle_aware_fallback = Arc::new(
                 AdaptiveStrategy::new()
-                    .add_strategy(Arc::new(LayoutEngineAdapter::new(DagreLayout::new())))
                     .add_strategy(Arc::new(LayoutEngineAdapter::new(ForceLayout::new())))
-                    .add_strategy(Arc::new(LayoutEngineAdapter::new(ElkLayout::new()))),
+                    .add_strategy(Arc::new(LayoutEngineAdapter::new(ElkLayout::new())))
+                    .add_strategy(Arc::new(LayoutEngineAdapter::new(DagreLayout::new()))),
             );
 
             // Create ML layout adapter
-            if let Ok(ml_strategy) = MLLayoutStrategy::new(adaptive_fallback) {
+            if let Ok(ml_strategy) = MLLayoutStrategy::new(cycle_aware_fallback) {
                 let ml_strategy_arc = Arc::new(ml_strategy);
                 manager.register("ml", Box::new(MLLayoutEngine(ml_strategy_arc.clone())));
                 manager.register("ml-enhanced", Box::new(MLLayoutEngine(ml_strategy_arc)));

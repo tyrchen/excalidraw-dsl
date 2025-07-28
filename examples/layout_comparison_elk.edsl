@@ -1,0 +1,101 @@
+# Layout Comparison Test
+# This example demonstrates the same complex graph with different layout algorithms
+---
+layout: elk
+theme: light
+node_spacing: 100
+edge_spacing: 60
+---
+
+# Complex Graph for Layout Testing
+# This creates a moderately complex graph to test ML layout quality
+
+# Frontend Layer
+web_ui [Web UI];
+mobile_app [Mobile App];
+admin_panel [Admin Panel];
+
+# API Layer
+api_gateway [API Gateway];
+auth_service [Auth Service];
+user_service [User Service];
+order_service [Order Service];
+payment_service [Payment Service];
+notification_service [Notification Service];
+
+# Business Logic Layer
+inventory_manager [Inventory Manager];
+pricing_engine [Pricing Engine];
+recommendation_engine [Recommendation Engine];
+analytics_service [Analytics Service];
+
+# Data Layer
+user_db [User Database];
+order_db [Order Database];
+payment_db [Payment Database];
+inventory_db [Inventory Database];
+cache_layer [Cache Layer];
+message_queue [Message Queue];
+
+# External Services
+payment_gateway [Payment Gateway];
+email_service [Email Service];
+sms_service [SMS Service];
+
+# User flows
+web_ui -> api_gateway;
+mobile_app -> api_gateway;
+admin_panel -> api_gateway;
+
+# Authentication flow
+api_gateway -> auth_service;
+auth_service -> user_service;
+user_service -> user_db;
+
+# Core business flows
+api_gateway -> user_service;
+api_gateway -> order_service;
+api_gateway -> payment_service;
+
+# Order processing
+order_service -> inventory_manager;
+order_service -> pricing_engine;
+order_service -> payment_service;
+order_service -> notification_service;
+order_service -> order_db;
+
+# Payment processing
+payment_service -> payment_gateway;
+payment_service -> payment_db;
+payment_service -> notification_service;
+
+# Inventory management
+inventory_manager -> inventory_db;
+inventory_manager -> cache_layer;
+
+# Pricing and recommendations
+pricing_engine -> inventory_db;
+pricing_engine -> cache_layer;
+recommendation_engine -> analytics_service;
+recommendation_engine -> user_db;
+recommendation_engine -> cache_layer;
+
+# Analytics and data flow
+analytics_service -> user_db;
+analytics_service -> order_db;
+analytics_service -> payment_db;
+
+# Notifications
+notification_service -> email_service;
+notification_service -> sms_service;
+notification_service -> message_queue;
+
+# Cache interactions
+user_service -> cache_layer;
+order_service -> cache_layer;
+payment_service -> cache_layer;
+
+# Message queue interactions
+order_service -> message_queue;
+payment_service -> message_queue;
+analytics_service -> message_queue;

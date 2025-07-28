@@ -1,0 +1,22 @@
+# Simple ML Layout Test
+---
+layout: ml
+theme: light
+---
+
+# Simple graph to test ML layout
+user [User];
+api [API Gateway];
+auth [Auth Service];
+db [Database];
+cache [Cache];
+queue [Message Queue];
+
+# Create some connections
+user -> api;
+api -> auth;
+api -> db;
+api -> cache;
+auth -> db;
+db -> queue;
+cache -> queue;

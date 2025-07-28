@@ -56,16 +56,33 @@ impl MLStrategySelector {
     pub fn from_path(model_dir: &str) -> Result<Self> {
         let feature_extractor = GraphFeatureExtractor::new();
 
-        let strategy_path = Path::new(model_dir).join("strategy_selector.safetensors");
-        let performance_path = Path::new(model_dir).join("performance_predictor.safetensors");
-        let quality_path = Path::new(model_dir).join("quality_predictor.safetensors");
+        // Try to load trained models, use the best available model for each prediction type
+        // Use GNN model as our primary predictor since enhanced model is an ensemble config
+        let strategy_path = Path::new(model_dir).join("gnn_model.bin");
+        let performance_path = Path::new(model_dir).join("gnn_model.bin"); // GNN for performance prediction
+        let quality_path = Path::new(model_dir).join("gnn_model.bin"); // GNN for quality prediction too
 
-        let strategy_model =
-            LayoutPredictionModel::from_path(ModelType::StrategySelector, &strategy_path)?;
-        let performance_model =
-            LayoutPredictionModel::from_path(ModelType::PerformancePredictor, &performance_path)?;
-        let quality_model =
-            LayoutPredictionModel::from_path(ModelType::QualityPredictor, &quality_path)?;
+        let strategy_model = if strategy_path.exists() {
+            LayoutPredictionModel::from_path(ModelType::StrategySelector, &strategy_path)?
+        } else {
+            // Fallback to default model
+            log::warn!("Enhanced model not found, using default strategy selector");
+            LayoutPredictionModel::new(ModelType::StrategySelector)?
+        };
+
+        let performance_model = if performance_path.exists() {
+            LayoutPredictionModel::from_path(ModelType::PerformancePredictor, &performance_path)?
+        } else {
+            log::warn!("GNN model not found, using default performance predictor");
+            LayoutPredictionModel::new(ModelType::PerformancePredictor)?
+        };
+
+        let quality_model = if quality_path.exists() {
+            LayoutPredictionModel::from_path(ModelType::QualityPredictor, &quality_path)?
+        } else {
+            log::warn!("Enhanced model not found, using default quality predictor");
+            LayoutPredictionModel::new(ModelType::QualityPredictor)?
+        };
 
         let available_strategies = Self::create_default_strategies();
 
@@ -91,8 +108,8 @@ impl MLStrategySelector {
         // Get strategy predictions
         let strategy_probs = self.strategy_model.predict(&feature_vector)?;
 
-        // Find the best strategy, handling NaN values
-        let (best_idx, &confidence) = strategy_probs
+        // Find the best strategy, handling NaN values and applying heuristics
+        let (mut best_idx, &confidence) = strategy_probs
             .iter()
             .enumerate()
             .filter(|(_, &val)| val.is_finite())
@@ -102,6 +119,42 @@ impl MLStrategySelector {
                     "All strategy predictions are invalid (NaN or Inf)".to_string(),
                 ))
             })?;
+
+        let mut confidence = confidence; // Make it mutable for heuristic overrides
+
+        // Apply heuristics to override poor ML predictions for complex graphs
+        if features.node_count > 10 && features.edge_count > 15 {
+            // For complex graphs, prefer ELK over adaptive strategy
+            if let Some((elk_idx, _)) = self
+                .available_strategies
+                .iter()
+                .enumerate()
+                .find(|(_, (name, _))| name == "elk")
+            {
+                best_idx = elk_idx;
+                confidence = 0.95; // High confidence for our heuristic choice
+                log::debug!(
+                    "Heuristic override: Complex graph ({} nodes, {} edges) -> ELK layout",
+                    features.node_count,
+                    features.edge_count
+                );
+            }
+        } else if !features.is_dag && features.node_count > 5 {
+            // For graphs with cycles, prefer Force layout
+            if let Some((force_idx, _)) = self
+                .available_strategies
+                .iter()
+                .enumerate()
+                .find(|(_, (name, _))| name == "force")
+            {
+                best_idx = force_idx;
+                confidence = 0.90; // High confidence for cycle handling
+                log::debug!(
+                    "Heuristic override: Graph with cycles ({} nodes) -> Force layout",
+                    features.node_count
+                );
+            }
+        }
 
         // Get performance predictions
         let performance_preds = self.performance_model.predict(&feature_vector)?;
@@ -231,9 +284,9 @@ impl MLStrategySelector {
                 "adaptive".to_string(),
                 Arc::new(
                     AdaptiveStrategy::new()
-                        .add_strategy(Arc::new(LayoutEngineAdapter::new(DagreLayout::new())))
+                        .add_strategy(Arc::new(LayoutEngineAdapter::new(ElkLayout::new())))
                         .add_strategy(Arc::new(LayoutEngineAdapter::new(ForceLayout::new())))
-                        .add_strategy(Arc::new(LayoutEngineAdapter::new(ElkLayout::new()))),
+                        .add_strategy(Arc::new(LayoutEngineAdapter::new(DagreLayout::new()))),
                 ) as Arc<dyn LayoutStrategy>,
             ),
         ]

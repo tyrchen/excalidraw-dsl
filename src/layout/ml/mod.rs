@@ -14,6 +14,8 @@ mod training;
 #[cfg(feature = "ml-layout")]
 mod constraints;
 #[cfg(feature = "ml-layout")]
+mod direct;
+#[cfg(feature = "ml-layout")]
 mod enhanced;
 #[cfg(feature = "ml-layout")]
 mod feedback;
@@ -38,6 +40,8 @@ pub use constraints::{
     Axis, ConstraintSolution, Direction, LayoutConstraint, NeuralConstraintSolver,
 };
 #[cfg(feature = "ml-layout")]
+pub use direct::DirectMLLayoutStrategy;
+#[cfg(feature = "ml-layout")]
 pub use enhanced::{EnhancedMLConfig, EnhancedMLLayoutBuilder, EnhancedMLLayoutStrategy};
 #[cfg(feature = "ml-layout")]
 pub use feedback::{FeedbackCollector, FeedbackSession, FeedbackType, OnlineModelUpdater};
@@ -54,72 +58,45 @@ use std::sync::Arc;
 
 pub type Network = Box<dyn Fn(&Tensor) -> candle_core::Result<Tensor> + Send + Sync>;
 
-/// ML-enhanced layout strategy that uses machine learning to select optimal layouts
+/// ML-enhanced layout strategy that uses machine learning to predict node positions directly
 #[cfg(feature = "ml-layout")]
 pub struct MLLayoutStrategy {
-    selector: Arc<MLStrategySelector>,
-    fallback_strategy: Arc<dyn LayoutStrategy>,
+    direct_ml: DirectMLLayoutStrategy,
 }
 
 #[cfg(feature = "ml-layout")]
 impl MLLayoutStrategy {
     pub fn new(fallback_strategy: Arc<dyn LayoutStrategy>) -> Result<Self> {
-        let selector = Arc::new(MLStrategySelector::new()?);
-        Ok(Self {
-            selector,
-            fallback_strategy,
-        })
+        log::info!("Initializing Direct ML Layout Strategy");
+        let direct_ml = DirectMLLayoutStrategy::new(fallback_strategy)?;
+
+        Ok(Self { direct_ml })
     }
 
     pub fn with_model_path(
         model_path: &str,
         fallback_strategy: Arc<dyn LayoutStrategy>,
     ) -> Result<Self> {
-        let selector = Arc::new(MLStrategySelector::from_path(model_path)?);
-        Ok(Self {
-            selector,
-            fallback_strategy,
-        })
+        let model_path = std::path::Path::new(model_path).join("gnn_model.bin");
+        let direct_ml = DirectMLLayoutStrategy::with_model_path(&model_path, fallback_strategy)?;
+
+        Ok(Self { direct_ml })
     }
 }
 
 #[cfg(feature = "ml-layout")]
 impl LayoutStrategy for MLLayoutStrategy {
     fn apply(&self, igr: &mut IntermediateGraph, context: &LayoutContext) -> Result<()> {
-        // Try ML-based strategy selection
-        match self.selector.select_strategy(igr, context) {
-            Ok(prediction) => {
-                log::info!(
-                    "ML selected strategy: {} with confidence: {:.2}",
-                    prediction.strategy_name,
-                    prediction.confidence
-                );
-
-                // If confidence is high enough, use the selected strategy
-                if prediction.confidence > 0.7 {
-                    if let Some(strategy) = prediction.strategy {
-                        return strategy.apply(igr, context);
-                    }
-                }
-
-                // Otherwise fall back
-                log::info!("ML confidence too low, using fallback strategy");
-                self.fallback_strategy.apply(igr, context)
-            }
-            Err(e) => {
-                log::warn!("ML strategy selection failed: {e}, using fallback");
-                self.fallback_strategy.apply(igr, context)
-            }
-        }
+        log::info!("🤖 Using Direct ML Layout - GNN predicts node positions directly");
+        self.direct_ml.apply(igr, context)
     }
 
     fn name(&self) -> &'static str {
-        "ml-enhanced"
+        "direct-ml"
     }
 
     fn supports(&self, igr: &IntermediateGraph) -> bool {
-        // ML strategy supports all graphs
-        self.fallback_strategy.supports(igr)
+        self.direct_ml.supports(igr)
     }
 }
 
