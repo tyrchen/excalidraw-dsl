@@ -1,0 +1,92 @@
+# Neural Network Architecture with ML Layout
+# This example shows how ML layout can optimize the visualization of neural network architectures
+
+diagram neural_network_architecture {
+    # Input Layer
+    input_data [label="Input Data"];
+    preprocessing [label="Preprocessing"];
+
+    # Data Augmentation
+    augmentation [label="Data Augmentation"];
+    normalization [label="Normalization"];
+
+    # Feature Extraction
+    conv1 [label="Conv2D Layer 1"];
+    pool1 [label="MaxPool2D 1"];
+    conv2 [label="Conv2D Layer 2"];
+    pool2 [label="MaxPool2D 2"];
+    conv3 [label="Conv2D Layer 3"];
+    pool3 [label="MaxPool2D 3"];
+
+    # Dimensionality Reduction
+    flatten [label="Flatten"];
+    dropout1 [label="Dropout 50%"];
+
+    # Dense Layers
+    dense1 [label="Dense 512"];
+    relu1 [label="ReLU"];
+    batch_norm1 [label="Batch Norm"];
+    dropout2 [label="Dropout 30%"];
+
+    dense2 [label="Dense 256"];
+    relu2 [label="ReLU"];
+    batch_norm2 [label="Batch Norm"];
+    dropout3 [label="Dropout 20%"];
+
+    dense3 [label="Dense 128"];
+    relu3 [label="ReLU"];
+
+    # Output Layer
+    output_layer [label="Output Dense"];
+    softmax [label="Softmax"];
+    predictions [label="Predictions"];
+
+    # Loss and Optimization
+    loss_function [label="Categorical Crossentropy"];
+    optimizer [label="Adam Optimizer"];
+    metrics [label="Accuracy Metrics"];
+
+    # Training Components
+    train_data [label="Training Data"];
+    val_data [label="Validation Data"];
+    test_data [label="Test Data"];
+
+    # Model Management
+    checkpoints [label="Model Checkpoints"];
+    tensorboard [label="TensorBoard"];
+    early_stopping [label="Early Stopping"];
+
+    # Main data flow
+    input_data -> preprocessing;
+    preprocessing -> augmentation -> normalization;
+
+    # Feature extraction pipeline
+    normalization -> conv1 -> pool1;
+    pool1 -> conv2 -> pool2;
+    pool2 -> conv3 -> pool3;
+
+    # Dense network
+    pool3 -> flatten -> dropout1;
+    dropout1 -> dense1 -> relu1 -> batch_norm1 -> dropout2;
+    dropout2 -> dense2 -> relu2 -> batch_norm2 -> dropout3;
+    dropout3 -> dense3 -> relu3;
+
+    # Output
+    relu3 -> output_layer -> softmax -> predictions;
+
+    # Training pipeline
+    train_data -> input_data;
+    val_data -> input_data;
+    test_data -> input_data;
+
+    # Loss and optimization
+    predictions -> loss_function;
+    loss_function -> optimizer;
+    optimizer -> metrics;
+
+    # Model management
+    optimizer -> checkpoints;
+    metrics -> tensorboard;
+    metrics -> early_stopping;
+    early_stopping -> optimizer;
+}

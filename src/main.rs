@@ -95,6 +95,38 @@ enum Commands {
         #[arg(short, long)]
         verbose: bool,
     },
+
+    /// Train ML layout models
+    #[cfg(feature = "ml-layout")]
+    Train {
+        /// Output directory for trained models
+        #[arg(short, long, default_value = "./models")]
+        output: PathBuf,
+
+        /// Training configuration (quick-test, m4-optimized, or custom)
+        #[arg(short, long, default_value = "quick-test")]
+        config: String,
+
+        /// Training phases to run (comma-separated: data, gnn, rl, constraint, enhanced, eval)
+        #[arg(short, long, default_value = "data,gnn,rl,constraint,enhanced,eval")]
+        phases: String,
+
+        /// Number of training samples to generate
+        #[arg(long, default_value = "1000")]
+        samples: usize,
+
+        /// Enable verbose output
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Use Apple M4 optimizations
+        #[arg(long)]
+        m4_optimize: bool,
+
+        /// Skip model evaluation phase
+        #[arg(long)]
+        skip_eval: bool,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Copy)]
@@ -180,6 +212,24 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             input,
             output,
             verbose,
+        }),
+        #[cfg(feature = "ml-layout")]
+        Commands::Train {
+            output,
+            config,
+            phases,
+            samples,
+            verbose,
+            m4_optimize,
+            skip_eval,
+        } => run_train(TrainArgs {
+            output,
+            config,
+            phases,
+            samples,
+            verbose,
+            m4_optimize,
+            skip_eval,
         }),
     }
 }
@@ -394,6 +444,17 @@ struct WatchArgs {
     verbose: bool,
 }
 
+#[cfg(feature = "ml-layout")]
+struct TrainArgs {
+    output: PathBuf,
+    config: String,
+    phases: String,
+    samples: usize,
+    verbose: bool,
+    m4_optimize: bool,
+    skip_eval: bool,
+}
+
 fn run_watch(args: WatchArgs) -> Result<(), Box<dyn std::error::Error>> {
     use notify::{Event, EventKind, RecursiveMode, Watcher};
     use std::sync::mpsc::channel;
@@ -479,6 +540,171 @@ fn compile_file(
 fn count_elements_in_json(json: &str) -> usize {
     // Simple count by looking for element objects
     json.matches(r#""type":"#).count()
+}
+
+#[cfg(feature = "ml-layout")]
+fn run_train(args: TrainArgs) -> Result<(), Box<dyn std::error::Error>> {
+    use excalidraw_dsl::training::{config::TrainingConfig, TrainingOrchestrator};
+
+    if args.verbose {
+        println!("🚀 Starting ML Layout Training");
+        println!("Output directory: {}", args.output.display());
+        println!("Configuration: {}", args.config);
+        println!("Phases: {}", args.phases);
+        println!("Samples: {}", args.samples);
+        if args.m4_optimize {
+            println!("🍎 Apple M4 optimizations enabled");
+        }
+    }
+
+    // Create output directory
+    std::fs::create_dir_all(&args.output)?;
+
+    // Parse requested phases
+    let requested_phases: Vec<&str> = args.phases.split(',').map(|s| s.trim()).collect();
+
+    // Create training configuration
+    let mut config = match args.config.as_str() {
+        "quick-test" => TrainingConfig::quick_test(),
+        "m4-optimized" => TrainingConfig::m4_optimized(),
+        _ => {
+            eprintln!("Unknown config '{}'. Using quick-test.", args.config);
+            TrainingConfig::quick_test()
+        }
+    };
+
+    // Apply command line overrides
+    config.output_dir = args.output.clone();
+    config.data_config.num_samples = args.samples;
+
+    if args.m4_optimize {
+        config = TrainingConfig::m4_optimized();
+        config.output_dir = args.output.clone();
+        config.data_config.num_samples = args.samples;
+    }
+
+    // Skip evaluation if requested
+    if args.skip_eval {
+        // Skip evaluation phase (handled by phase selection)
+    }
+
+    if args.verbose {
+        println!("\n📋 Training Configuration:");
+        println!("  Data samples: {}", config.data_config.num_samples);
+        println!("  GNN epochs: {}", config.gnn_config.model.max_epochs);
+        println!("  RL episodes: {}", config.rl_config.num_episodes);
+        println!(
+            "  Constraint epochs: {}",
+            config.constraint_config.model.max_epochs
+        );
+        println!(
+            "  Enhanced epochs: {}",
+            config.enhanced_config.num_integration_epochs
+        );
+        println!("  Device: {:?}", config.device);
+    }
+
+    // Create and run training orchestrator
+    let mut orchestrator = TrainingOrchestrator::new(config)?;
+
+    println!("\n🎯 Starting training pipeline...");
+
+    // Run training phases
+    for phase in &requested_phases {
+        match *phase {
+            "data" => {
+                if args.verbose {
+                    println!("\n📊 Running data generation phase...");
+                }
+                orchestrator.run_data_generation()?;
+            }
+            "gnn" => {
+                if args.verbose {
+                    println!("\n🧠 Running GNN training phase...");
+                }
+                orchestrator.run_gnn_training()?;
+            }
+            "rl" => {
+                if args.verbose {
+                    println!("\n🎮 Running RL training phase...");
+                }
+                orchestrator.run_rl_training()?;
+            }
+            "constraint" => {
+                if args.verbose {
+                    println!("\n🧩 Running constraint training phase...");
+                }
+                orchestrator.run_constraint_training()?;
+            }
+            "enhanced" => {
+                if args.verbose {
+                    println!("\n⚡ Running enhanced model training phase...");
+                }
+                orchestrator.run_enhanced_training()?;
+            }
+            "eval" => {
+                if !args.skip_eval {
+                    if args.verbose {
+                        println!("\n📈 Running evaluation phase...");
+                    }
+                    orchestrator.run_evaluation()?;
+                }
+            }
+            _ => {
+                eprintln!("⚠️  Unknown phase '{phase}', skipping...");
+            }
+        }
+    }
+
+    // Generate final report
+    let metrics_path = args.output.join("training_metrics.json");
+    let report_path = args.output.join("training_report.md");
+
+    orchestrator.save_metrics(&metrics_path)?;
+    orchestrator.generate_report(&report_path)?;
+
+    println!("\n✅ Training completed successfully!");
+    println!("📊 Metrics saved to: {}", metrics_path.display());
+    println!("📄 Report generated: {}", report_path.display());
+    println!("🗂️  Models saved in: {}", args.output.display());
+
+    if args.verbose {
+        println!("\n📋 Training Summary:");
+        if let Some(metrics) = orchestrator.get_metrics() {
+            if let Some(ref data_stats) = metrics.data_generation {
+                println!(
+                    "  📊 Generated {} training samples",
+                    data_stats.total_samples
+                );
+            }
+            if let Some(ref gnn_results) = metrics.gnn_training {
+                println!("  🧠 GNN final loss: {:.6}", gnn_results.final_loss);
+            }
+            if let Some(ref rl_results) = metrics.rl_training {
+                println!("  🎮 RL average reward: {:.3}", rl_results.avg_reward);
+            }
+            if let Some(ref constraint_results) = metrics.constraint_training {
+                println!(
+                    "  🧩 Constraint accuracy: {:.1}%",
+                    constraint_results.accuracy * 100.0
+                );
+            }
+            if let Some(ref enhanced_results) = metrics.enhanced_training {
+                println!(
+                    "  ⚡ Enhanced quality score: {:.3}",
+                    enhanced_results.quality_score
+                );
+            }
+            if let Some(ref eval_results) = metrics.evaluation {
+                println!(
+                    "  📈 Overall evaluation score: {:.3}",
+                    eval_results.overall_score
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

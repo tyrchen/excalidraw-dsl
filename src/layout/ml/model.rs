@@ -1,6 +1,7 @@
 // src/layout/ml/model.rs
 //! ML model abstractions for layout prediction and quality estimation
 
+use super::Network;
 use crate::error::{EDSLError, Result};
 use candle_core::{Device, Module, Tensor};
 use candle_nn::{VarBuilder, VarMap};
@@ -33,7 +34,6 @@ pub struct QualityMetrics {
     pub aesthetic_score: f64,
 }
 
-type Network = Box<dyn Fn(&Tensor) -> candle_core::Result<Tensor> + Send + Sync>;
 /// Neural network model for layout predictions
 pub struct LayoutPredictionModel {
     #[allow(dead_code)]

@@ -1,6 +1,7 @@
 // src/layout/ml/rl.rs
 //! Reinforcement Learning for layout optimization
 
+use super::Network;
 use crate::error::{EDSLError, Result};
 use crate::igr::IntermediateGraph;
 use candle_core::{Device, Module, Tensor};
@@ -431,8 +432,8 @@ pub struct LayoutPolicy {
     #[allow(dead_code)]
     var_map: VarMap,
     device: Device,
-    actor_net: Box<dyn Fn(&Tensor) -> candle_core::Result<Tensor> + Send + Sync>,
-    critic_net: Box<dyn Fn(&Tensor) -> candle_core::Result<Tensor> + Send + Sync>,
+    actor_net: Network,
+    critic_net: Network,
 }
 
 impl LayoutPolicy {

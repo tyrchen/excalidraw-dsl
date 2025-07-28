@@ -20,6 +20,9 @@ pub mod llm;
 #[cfg(feature = "server")]
 pub mod server;
 
+#[cfg(feature = "ml-layout")]
+pub mod training;
+
 #[cfg(test)]
 mod tests;
 

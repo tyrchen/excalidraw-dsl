@@ -294,6 +294,7 @@ impl GraphFeatureExtractor {
         (max_depth, avg_children, nesting_complexity)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn calculate_container_depth(
         &self,
         igr: &IntermediateGraph,

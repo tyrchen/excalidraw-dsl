@@ -175,8 +175,8 @@ impl NeuralConstraintSolver {
 
             // Evaluate constraints
             let (satisfied, violated) = self.evaluate_constraints(constraints, &new_positions);
-            let feasibility_score = match feasibility.dims() {
-                &[1, 1] => feasibility
+            let feasibility_score = match *feasibility.dims() {
+                [1, 1] => feasibility
                     .squeeze(0)
                     .map_err(|e| {
                         EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
@@ -195,7 +195,7 @@ impl NeuralConstraintSolver {
                             "Failed to extract feasibility: {e}"
                         )))
                     })? as f64,
-                &[1] => feasibility
+                [1] => feasibility
                     .squeeze(0)
                     .map_err(|e| {
                         EDSLError::Layout(crate::error::LayoutError::CalculationFailed(format!(
